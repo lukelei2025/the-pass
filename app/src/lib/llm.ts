@@ -72,57 +72,76 @@ export function identifyPlatform(url: string): { name: string; category: Categor
  * 尝试获取网页标题
  * 策略: 优先使用本地 Vite 代理（绕过 CORS），失败则回退到 AllOrigins
  */
+/**
+ * 尝试获取网页标题
+ * 策略:
+ * 1. 开发环境: 使用本地 Vite 代理 (最可靠)
+ * 2. 生产环境: 使用公共 CORS 代理 (corsproxy.io 或 allorigins)
+ */
 async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | null> {
-    // 策略 1: 本地 Vite 开发服务器代理（最可靠，支持微信等受限平台）
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // 策略 1: 本地 Vite 开发服务器代理 (仅 Dev 环境可用)
+    if (import.meta.env.DEV) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        const proxyUrl = `/api/fetch-title?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
+            const proxyUrl = `/api/fetch-title?url=${encodeURIComponent(url)}`;
+            const response = await fetch(proxyUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.title) {
-                console.log(`[本地代理] 获取到标题: ${data.title}`);
-                return data.title;
+            if (response.ok) {
+                const data = await response.json();
+                if (data.title) {
+                    console.log(`[本地代理] 获取到标题: ${data.title}`);
+                    return data.title;
+                }
             }
+        } catch (err) {
+            console.warn('[本地代理] 请求失败，尝试备用方案:', err);
         }
-    } catch (err) {
-        console.warn('[本地代理] 请求失败，尝试备用方案:', err);
     }
 
-    // 策略 2: AllOrigins 公共代理（部分平台可能被拦截）
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // 策略 2: Public CORS Proxies (生产环境)
+    // 优先使用 corsproxy.io (通常更稳定)
+    const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+    ];
 
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
+    for (const proxyUrl of proxies) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        if (!response.ok) return null;
+            const response = await fetch(proxyUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
 
-        const data = await response.json();
-        const html = data.contents;
-        if (!html) return null;
+            if (!response.ok) continue;
 
-        // 提取标题
-        const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-        if (ogMatch?.[1]) return decodeHtmlEntities(ogMatch[1].trim());
+            let html = '';
+            if (proxyUrl.includes('allorigins')) {
+                const data = await response.json();
+                html = data.contents;
+            } else {
+                html = await response.text();
+            }
 
-        const msgMatch = html.match(/var\s+msg_title\s*=\s*["']([^"']+)["']/);
-        if (msgMatch?.[1]) return decodeHtmlEntities(msgMatch[1].trim());
+            if (!html) continue;
 
-        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        if (titleMatch?.[1]) return decodeHtmlEntities(titleMatch[1].trim());
-
-    } catch (err) {
-        console.warn('[AllOrigins] 请求失败:', err);
+            // 提取标题
+            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            if (titleMatch?.[1]) {
+                const title = decodeHtmlEntities(titleMatch[1].trim());
+                console.log(`[CORS代理] 获取到标题: ${title}`);
+                return title;
+            }
+        } catch (err) {
+            console.warn(`[CORS代理] 失败: ${proxyUrl}`, err);
+        }
     }
 
     return null;
+}
 }
 
 /**
