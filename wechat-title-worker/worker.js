@@ -80,22 +80,25 @@ function extractAuthorInfo(html) {
     // 1. 公众号名称 - 多重策略 (优先级：JsDecode > htmlDecode > JS Object > JS var > DOM > Meta)
 
     // 策略 A: 匹配 JsDecode 包装的内容 (e.g. nickname: JsDecode('...'))
-    const jsDecodeMatch = html.match(/nickname\s*:\s*JsDecode\(['"]([^'"]+)['"]\)/i);
+    // 支持 "nickname" 或 "nick_name"
+    const jsDecodeMatch = html.match(/(?:nickname|nick_name)\s*:\s*JsDecode\(['"]([^'"]+)['"]\)/i);
 
     // 策略 B: 匹配 var nickname = htmlDecode("...") (常见的旧版/PC版结构)
     const accountMatchHtmlDecode = html.match(/var\s+nickname\s*=\s*htmlDecode\(['"]([^'"]+)['"]\)/i);
 
     // 策略 C: 匹配 JSON/Object 属性 (e.g. nickname: '星期一研究室')
     // ⚠️ 排除 "data-miniprogram-nickname" 这种占位符
-    const jsObjMatch1 = html.match(/nickname\s*:\s*['"]((?!data-miniprogram-nickname)[^'"]+)['"]/i);
+    //同样支持 "nickname" 或 "nick_name"
+    const jsObjMatch1 = html.match(/(?:nickname|nick_name)\s*:\s*['"]((?!data-miniprogram-nickname)[^'"]+)['"]/i);
     const jsObjMatch2 = html.match(/brand_name\s*:\s*['"]([^'"]+)['"]/i);
 
     // 策略 D (旧): 匹配 var 变量
     const accountMatch1 = html.match(/var\s+nickname\s*=\s*"([^"]+)"/i);
-    const accountMatch2 = html.match(/"nick_name"\s*:\s*"([^"]+)"/i);
 
     // 策略 E: DOM 匹配
+    // 增加 .wx_follow_nickname 匹配
     const domMatch = html.match(/<strong[^>]*class="[^"]*profile_nickname[^"]*"[^>]*>(.*?)<\/strong>/i) ||
+        html.match(/class="[^"]*wx_follow_nickname[^"]*"[^>]*>(.*?)<\//i) ||
         html.match(/id="js_name">\s*([^<]+?)\s*<\/a>/i) ||
         html.match(/id="js_name">\s*([^<]+?)\s*<\/strong>/i);
 
@@ -108,7 +111,6 @@ function extractAuthorInfo(html) {
         jsObjMatch1?.[1] ||
         jsObjMatch2?.[1] ||
         accountMatch1?.[1] ||
-        accountMatch2?.[1] ||
         domMatch?.[1]?.trim() ||
         accountMatch3?.[1] ||
         null;
