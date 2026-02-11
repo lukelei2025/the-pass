@@ -78,7 +78,7 @@ export function identifyPlatform(url: string): { name: string; category: Categor
  * 1. 开发环境: 使用本地 Vite 代理 (最可靠)
  * 2. 生产环境: 使用公共 CORS 代理 (corsproxy.io 或 allorigins)
  */
-async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | null> {
+async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | null> {
     // 策略 1: 本地 Vite 开发服务器代理 (仅 Dev 环境可用)
     if (import.meta.env.DEV) {
         try {
