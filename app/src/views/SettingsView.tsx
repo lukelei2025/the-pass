@@ -4,12 +4,12 @@ import { testApiConnection } from '../lib/llm';
 
 export default function SettingsView() {
     const { settings, updateSettings, setCurrentView } = useStore();
-    const [apiKey, setApiKey] = useState(settings.llmApiKey);
+    const [apiKey, setApiKey] = useState(localStorage.getItem('llmApiKey') || '');
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTesting, setIsTesting] = useState(false);
 
     const handleSave = async () => {
-        await updateSettings({ llmApiKey: apiKey });
+        localStorage.setItem('llmApiKey', apiKey);
         alert('Settings Saved');
     };
 

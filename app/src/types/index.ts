@@ -55,8 +55,7 @@ export interface Settings {
   theme: 'light' | 'dark';
   enableReminders: boolean;
   clearanceEnabled: boolean;
-  // LLM 配置
-  llmApiKey: string;
+  // LLM 配置 (llmApiKey 存在 localStorage, 不上传云端)
   llmAutoClassify: boolean;
 }
 

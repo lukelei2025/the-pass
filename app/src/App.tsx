@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import WorkbenchView from './views/WorkbenchView';
 import MenuView from './views/MenuView';
 import FreezerView from './views/FreezerView';
 import HistoryView from './views/HistoryView';
 import SettingsView from './views/SettingsView';
+import LoginPage from './views/LoginPage';
 
-function App() {
-  const { currentView, checkExpired, setCurrentView } = useStore();
+function AppContent() {
+  const { currentView, checkExpired, setCurrentView, initializeForUser } = useStore();
+  const { user, loading, signOut } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
 
   // Check mobile state
@@ -18,12 +21,33 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Initialize store when user logs in
+  useEffect(() => {
+    if (user) {
+      initializeForUser(user.uid);
+    }
+  }, [user, initializeForUser]);
+
   useEffect(() => {
     const interval = setInterval(checkExpired, 60000);
     return () => clearInterval(interval);
   }, [checkExpired]);
 
   useEffect(() => { checkExpired(); }, [checkExpired]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg-app)] flex items-center justify-center">
+        <div className="text-[var(--color-ink-secondary)] text-[15px]">Loading...</div>
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (!user) {
+    return <LoginPage />;
+  }
 
   const renderView = () => {
     switch (currentView) {
@@ -73,7 +97,7 @@ function App() {
             ))}
           </nav>
 
-          <div className="mt-auto px-3 py-2 border-t border-[rgba(0,0,0,0.06)]">
+          <div className="mt-auto px-3 py-2 border-t border-[rgba(0,0,0,0.06)] space-y-1">
             <button
               onClick={() => setCurrentView('settings')}
               className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${currentView === 'settings' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-secondary)] hover:text-[var(--color-ink)]'
@@ -82,6 +106,23 @@ function App() {
               <svg className="w-4 h-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" /></svg>
               Settings
             </button>
+
+            {/* User info + Sign out */}
+            <div className="flex items-center gap-2 px-3 py-1.5">
+              {user.photoURL && (
+                <img src={user.photoURL} alt="" className="w-5 h-5 rounded-full" />
+              )}
+              <span className="text-[12px] text-[var(--color-ink-secondary)] truncate flex-1">
+                {user.displayName || user.email}
+              </span>
+              <button
+                onClick={signOut}
+                className="text-[11px] text-[var(--color-ink-tertiary)] hover:text-[var(--color-red)] transition-colors"
+                title="Sign out"
+              >
+                ↗
+              </button>
+            </div>
           </div>
         </aside>
       )}
@@ -92,7 +133,18 @@ function App() {
         {isMobile && (
           <header className="glass-header sticky top-0 z-40 px-4 h-12 flex items-center justify-between flex-shrink-0">
             <div className="text-[17px] font-semibold text-[var(--color-ink)]">The Pass</div>
-            <button onClick={() => setCurrentView('settings')} className="text-[var(--color-accent)] text-[15px]">Settings</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setCurrentView('settings')} className="text-[var(--color-accent)] text-[15px]">Settings</button>
+              {user.photoURL && (
+                <img
+                  src={user.photoURL}
+                  alt=""
+                  className="w-6 h-6 rounded-full cursor-pointer"
+                  onClick={signOut}
+                  title="Sign out"
+                />
+              )}
+            </div>
           </header>
         )}
 
@@ -122,6 +174,14 @@ function App() {
         )}
       </main>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

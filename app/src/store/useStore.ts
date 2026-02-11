@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
 import type { Item, Settings, Category, ItemStatus } from '../types';
+import * as firestoreService from '../lib/firestoreService';
 
-// 初始化 localForage
+// 初始化 localForage (kept for migration and offline fallback)
 const itemsStore = localforage.createInstance({
   name: 'digital-workbench',
   storeName: 'items',
@@ -14,14 +15,13 @@ const settingsStore = localforage.createInstance({
   storeName: 'settings',
 });
 
-// 默认设置
+// 默认设置 (不包含 llmApiKey, 它存在 localStorage)
 const defaultSettings: Settings = {
   expireHours: 24,
   clearanceTime: '22:00',
   theme: 'light',
   enableReminders: true,
   clearanceEnabled: true,
-  llmApiKey: '',
   llmAutoClassify: true,
 };
 
@@ -29,6 +29,11 @@ interface StoreState {
   items: Item[];
   settings: Settings;
   currentView: 'workbench' | 'menu' | 'freezer' | 'history' | 'settings';
+
+  // Auth state
+  userId: string | null;
+  isOnline: boolean;
+  migrationDone: boolean;
 
   // Items 操作
   addItem: (item: Omit<Item, 'id' | 'createdAt' | 'expiresAt'>) => Promise<void>;
@@ -44,6 +49,10 @@ interface StoreState {
 
   // 视图切换
   setCurrentView: (view: 'workbench' | 'menu' | 'freezer' | 'history' | 'settings') => void;
+
+  // Auth
+  setUserId: (userId: string | null) => void;
+  initializeForUser: (userId: string) => Promise<void>;
 
   // 工具方法
   checkExpired: () => Promise<void>;
@@ -62,12 +71,71 @@ function calculateExpireTime(hours: 24 | 48): number {
   return Date.now() + hours * 60 * 60 * 1000;
 }
 
+// Firestore unsubscribe tracker
+let unsubscribeItems: (() => void) | null = null;
+
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       items: [],
       settings: defaultSettings,
       currentView: 'workbench',
+      userId: null,
+      isOnline: true,
+      migrationDone: false,
+
+      // Set the logged-in user ID
+      setUserId: (userId) => {
+        set({ userId });
+      },
+
+      // Initialize store for a logged-in user
+      initializeForUser: async (userId) => {
+        // 1. Migrate local data if needed
+        if (!get().migrationDone) {
+          try {
+            // Read all local items
+            const localItems: Item[] = [];
+            await itemsStore.iterate<Item, void>((value) => {
+              localItems.push(value);
+            });
+
+            // Read local settings
+            const localSettings = await settingsStore.getItem<Settings>('settings');
+
+            await firestoreService.migrateLocalData(
+              userId,
+              localItems,
+              localSettings || defaultSettings
+            );
+
+            set({ migrationDone: true });
+          } catch (error) {
+            console.error('Migration error:', error);
+          }
+        }
+
+        // 2. Load settings from Firestore
+        try {
+          const cloudSettings = await firestoreService.getSettings(userId);
+          if (cloudSettings) {
+            set({ settings: cloudSettings });
+          }
+        } catch (error) {
+          console.error('Failed to load cloud settings:', error);
+        }
+
+        // 3. Subscribe to real-time items
+        if (unsubscribeItems) {
+          unsubscribeItems();
+        }
+
+        unsubscribeItems = firestoreService.subscribeToItems(userId, (items) => {
+          set({ items });
+        });
+
+        set({ userId, isOnline: true });
+      },
 
       // 添加卡片
       addItem: async (itemData) => {
@@ -78,33 +146,49 @@ export const useStore = create<StoreState>()(
           expiresAt: calculateExpireTime(get().settings.expireHours),
         };
 
-        // 保存到 localForage
-        await itemsStore.setItem(newItem.id, newItem);
+        const { userId } = get();
 
-        set((state) => ({
-          items: [...state.items, newItem],
-        }));
+        if (userId) {
+          // Online: write to Firestore (real-time subscription will update state)
+          await firestoreService.addItem(userId, newItem);
+        } else {
+          // Offline fallback: write to localForage
+          await itemsStore.setItem(newItem.id, newItem);
+          set((state) => ({
+            items: [...state.items, newItem],
+          }));
+        }
       },
 
       // 更新卡片
       updateItem: async (id, updates) => {
-        const item = get().items.find((i) => i.id === id);
-        if (!item) return;
+        const { userId } = get();
 
-        const updatedItem = { ...item, ...updates };
-        await itemsStore.setItem(id, updatedItem);
-
-        set((state) => ({
-          items: state.items.map((i) => (i.id === id ? updatedItem : i)),
-        }));
+        if (userId) {
+          await firestoreService.updateItem(userId, id, updates);
+        } else {
+          const item = get().items.find((i) => i.id === id);
+          if (!item) return;
+          const updatedItem = { ...item, ...updates };
+          await itemsStore.setItem(id, updatedItem);
+          set((state) => ({
+            items: state.items.map((i) => (i.id === id ? updatedItem : i)),
+          }));
+        }
       },
 
       // 删除卡片
       deleteItem: async (id) => {
-        await itemsStore.removeItem(id);
-        set((state) => ({
-          items: state.items.filter((i) => i.id !== id),
-        }));
+        const { userId } = get();
+
+        if (userId) {
+          await firestoreService.deleteItem(userId, id);
+        } else {
+          await itemsStore.removeItem(id);
+          set((state) => ({
+            items: state.items.filter((i) => i.id !== id),
+          }));
+        }
       },
 
       // 按状态获取卡片
@@ -133,7 +217,14 @@ export const useStore = create<StoreState>()(
       // 更新设置
       updateSettings: async (updates) => {
         const newSettings = { ...get().settings, ...updates };
-        await settingsStore.setItem('settings', newSettings);
+        const { userId } = get();
+
+        if (userId) {
+          await firestoreService.updateSettings(userId, newSettings);
+        } else {
+          await settingsStore.setItem('settings', newSettings);
+        }
+
         set({ settings: newSettings });
       },
 
@@ -171,7 +262,6 @@ export const useStore = create<StoreState>()(
           0
         );
 
-        // 如果当前时间已过清空时间
         if (now > clearanceTimeToday) {
           const pendingItems = items.filter((item) => item.status === 'pending');
           for (const item of pendingItems) {
@@ -200,18 +290,28 @@ export const useStore = create<StoreState>()(
             throw new Error('Invalid data format');
           }
 
-          // 导入所有卡片
-          for (const item of data.items as Item[]) {
-            await itemsStore.setItem(item.id, item);
-          }
+          const { userId } = get();
 
-          // 导入设置（如果存在）
-          if (data.settings) {
-            await settingsStore.setItem('settings', data.settings);
-            set({ settings: data.settings });
+          if (userId) {
+            // Import to Firestore
+            for (const item of data.items as Item[]) {
+              await firestoreService.addItem(userId, item);
+            }
+            if (data.settings) {
+              await firestoreService.updateSettings(userId, data.settings);
+              set({ settings: data.settings });
+            }
+          } else {
+            // Import to localForage
+            for (const item of data.items as Item[]) {
+              await itemsStore.setItem(item.id, item);
+            }
+            if (data.settings) {
+              await settingsStore.setItem('settings', data.settings);
+              set({ settings: data.settings });
+            }
+            set({ items: data.items });
           }
-
-          set({ items: data.items });
         } catch (error) {
           throw new Error('导入失败：数据格式不正确');
         }
@@ -219,10 +319,10 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'workbench-storage',
-      // 不持久化 items（用 localForage 单独管理）
+      // Only persist view and migration state locally
       partialize: (state) => ({
-        settings: state.settings,
         currentView: state.currentView,
+        migrationDone: state.migrationDone,
       }),
     }
   )
