@@ -61,10 +61,10 @@ function AppContent() {
   };
 
   const navItems = [
-    { id: 'workbench', label: 'The Pass', icon: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z' },
-    { id: 'menu', label: 'Mise en Place', icon: 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z' },
-    { id: 'freezer', label: 'Réserve', icon: 'M13 13v8h8v-8h-8zM3 21h8v-8H3v8zM3 3v8h8V3H3zm13.66-1.31L11 7.34 16.66 13l5.66-5.66-5.66-5.65z' },
-    { id: 'history', label: 'Le Journal', icon: 'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z' },
+    { id: 'workbench', label: 'Mise-en-place', icon: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z' },
+    { id: 'menu', label: 'Le Service', icon: 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z' },
+    { id: 'freezer', label: 'La Réserve', icon: 'M13 13v8h8v-8h-8zM3 21h8v-8H3v8zM3 3v8h8V3H3zm13.66-1.31L11 7.34 16.66 13l5.66-5.66-5.66-5.65z' },
+    { id: 'history', label: 'Le Journal', icon: 'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z' },
   ] as const;
 
   return (
@@ -74,7 +74,7 @@ function AppContent() {
         <aside className="glass-sidebar w-[260px] flex-shrink-0 h-screen sticky top-0 flex flex-col pt-8 pb-4 px-3 z-50">
           <div className="px-3 mb-6">
             <h1 className="text-[15px] font-semibold text-[var(--color-ink)] tracking-tight flex items-center gap-2">
-              <span className="w-5 h-5 bg-[#333] rounded-md text-white flex items-center justify-center text-xs">W</span>
+              <span className="w-5 h-5 bg-[#333] rounded-md text-white flex items-center justify-center text-xs">P</span>
               The Pass
             </h1>
           </div>

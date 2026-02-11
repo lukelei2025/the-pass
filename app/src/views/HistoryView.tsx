@@ -10,7 +10,7 @@ export default function HistoryView() {
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
-        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">History</h2>
+        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">Le Journal</h2>
         <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{processedItems.length} records</span>
       </div>
 
@@ -30,22 +30,31 @@ export default function HistoryView() {
               </tr>
             </thead>
             <tbody>
-              {processedItems.map((item) => (
-                <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
-                  <td className="px-4 py-3 font-medium capitalize text-[var(--color-ink-secondary)]">
-                    {item.status}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
-                      {CATEGORY_INFO[item.category].name}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-xs">{item.content}</td>
-                  <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono">
-                    {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+              {processedItems.map((item) => {
+                const statusMap: Record<string, string> = {
+                  cooked: 'Fini',
+                  todo: 'Tick',
+                  frozen: 'Stow',
+                  composted: 'Void',
+                  expired: 'Expired',
+                };
+                return (
+                  <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
+                    <td className="px-4 py-3 font-medium text-[var(--color-ink-secondary)]">
+                      {statusMap[item.status] || item.status}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
+                        {CATEGORY_INFO[item.category].name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-xs">{item.content}</td>
+                    <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono">
+                      {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

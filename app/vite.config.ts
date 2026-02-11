@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Information Workbench',
-        short_name: 'Workbench',
-        description: 'Your Personal Information Workbench',
+        name: 'The Pass',
+        short_name: 'The Pass',
+        description: 'The Pass - Your Personal Information Workbench',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',

@@ -97,7 +97,7 @@ export default function FreezerView() {
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
-        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">Réserve</h2>
+        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">La Réserve</h2>
         <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
           {filteredItems.length}{hasActiveFilters ? ` / ${frozenItems.length}` : ''} items
         </span>
@@ -116,7 +116,7 @@ export default function FreezerView() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search reserved items..."
+          placeholder="Search stowed items..."
           className="macos-input w-full pl-10 pr-4 py-2.5 text-[14px]"
         />
         {searchQuery && (
@@ -157,8 +157,8 @@ export default function FreezerView() {
                   key={source}
                   onClick={() => toggleSource(source)}
                   className={`px-3 py-1 rounded-full text-[12px] font-medium transition-all duration-150 cursor-pointer ${selectedSources.has(source)
-                      ? 'bg-[var(--color-ink)] text-white'
-                      : 'bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)] hover:bg-[rgba(0,0,0,0.08)]'
+                    ? 'bg-[var(--color-ink)] text-white'
+                    : 'bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)] hover:bg-[rgba(0,0,0,0.08)]'
                     }`}
                 >
                   {source}
