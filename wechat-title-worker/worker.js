@@ -61,6 +61,7 @@ export default {
                 success: true,
                 title: title,
                 author: authorInfo,
+                account: authorInfo?.account || null, // 向下兼容
                 url: targetUrl
             });
 
