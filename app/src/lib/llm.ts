@@ -126,6 +126,57 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
     return null;
 }
 
+/**
+ * 策略 3: LLM 联网搜索 (终极兜底)
+ * 当 Worker 失败时 (如微信反爬)，调用 GLM-4 的 web_search 能力去获取标题
+ */
+async function fetchTitleViaLLM(url: string, config: LLMConfig): Promise<string | null> {
+    if (!isApiConfigured(config)) return null;
+
+    try {
+        console.log(`[LLM 联网兜底] 尝试获取标题: ${url}`);
+        const response = await fetch(GLM_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify({
+                model: 'glm-4', // 必须使用支持联网的模型
+                messages: [
+                    {
+                        role: 'user',
+                        content: `请访问此链接并提取标题：${url}\n要求：只返回标题文本，不要包含任何解释或标点。如果无法访问，返回"null"。`
+                    }
+                ],
+                tools: [
+                    {
+                        type: "web_search",
+                        web_search: {
+                            enable: true // 开启联网
+                        }
+                    }
+                ],
+                temperature: 0.1,
+                max_tokens: 100,
+            }),
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+
+        if (content && content !== 'null' && !content.includes('无法访问')) {
+            // 清理可能包含的引号
+            return content.replace(/^["']|["']$/g, '');
+        }
+    } catch (err) {
+        console.warn('[LLM 联网兜底] 失败:', err);
+    }
+    return null;
+}
+
 
 
 /**
@@ -230,10 +281,17 @@ export async function classifyContent(
 
         // 尝试获取网页标题 (仅用于显示，不再用于分类逻辑，分类逻辑看用户原始输入)
         // 只有当用户没有提供上下文时，这个标题才会在分类时起到关键补充作用
-        const rawTitle = await fetchPageTitle(extractedUrl);
+        // 尝试获取网页标题 (Worker 优先)
+        let rawTitle = await fetchPageTitle(extractedUrl);
+
+        // 如果 Worker 失败 (可能是微信/知乎反爬)，尝试 LLM 联网兜底
+        if (!rawTitle && isApiConfigured(config)) {
+            rawTitle = await fetchTitleViaLLM(extractedUrl, config);
+        }
+
         if (rawTitle) {
             metadata.title = cleanPlatformTitle(rawTitle, extractedUrl);
-            console.log(`[服务端抓取] 获取到网页标题: ${metadata.title}`);
+            console.log(`[标题获取成功] ${metadata.title}`);
         }
     }
 
