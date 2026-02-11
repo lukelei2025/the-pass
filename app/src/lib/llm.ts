@@ -101,9 +101,12 @@ async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | 
         }
     }
 
-    // 策略 2: Public CORS Proxies (生产环境)
-    // 优先使用 corsproxy.io (通常更稳定)
+    // 策略 2: Cloudflare Worker 代理 (生产环境首选，支持飞书/微信自定义 UA)
+    const workerUrl = `https://workbench-title-proxy.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
+
+    // 策略 3: Public CORS Proxies (备用)
     const proxies = [
+        workerUrl,
         `https://corsproxy.io/?${encodeURIComponent(url)}`,
         `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
     ];
@@ -119,8 +122,16 @@ async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | 
             if (!response.ok) continue;
 
             let html = '';
-            if (proxyUrl.includes('allorigins')) {
+            // Cloudflare Worker 和 AllOrigins 返回 JSON，CorsProxy 返回 Text
+            if (proxyUrl.includes('workers.dev') || proxyUrl.includes('allorigins')) {
                 const data = await response.json();
+                if (proxyUrl.includes('workers.dev')) {
+                    if (data.title) {
+                        console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`);
+                        return data.title;
+                    }
+                    continue; // Worker 没返回 title
+                }
                 html = data.contents;
             } else {
                 html = await response.text();
@@ -128,7 +139,7 @@ async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | 
 
             if (!html) continue;
 
-            // 提取标题
+            // 提取标题 (针对 CorsProxy/AllOrigins HTML)
             const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
             if (titleMatch?.[1]) {
                 const title = decodeHtmlEntities(titleMatch[1].trim());
@@ -136,7 +147,7 @@ async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | 
                 return title;
             }
         } catch (err) {
-            console.warn(`[CORS代理] 失败: ${proxyUrl}`, err);
+            console.warn(`[代理请求失败]: ${proxyUrl}`, err);
         }
     }
 

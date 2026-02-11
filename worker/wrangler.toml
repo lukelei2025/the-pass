@@ -1,0 +1,7 @@
+name = "workbench-title-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-02-11"
+
+# 启用 Smart Placement (自动选择最近的节点)
+[placement]
+mode = "smart"
