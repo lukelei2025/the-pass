@@ -101,69 +101,32 @@ async function fetchPageTitle(url: string, timeoutMs = 10000): Promise<string | 
         }
     }
 
-    // 策略 2: Cloudflare Worker 代理 (生产环境首选，支持飞书/微信自定义 UA)
+    // 策略 2: Cloudflare Worker 代理 (生产环境唯一指定方案)
+    // 自建 Worker 支持自定义 UA，专治飞书/微信等反爬
     const workerUrl = `https://workbench-title-proxy.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
 
-    // 策略 3: Public CORS Proxies (备用)
-    const proxies = [
-        workerUrl,
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-    ];
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    for (const proxyUrl of proxies) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const response = await fetch(workerUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
 
-            const response = await fetch(proxyUrl, { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (!response.ok) continue;
-
-            let html = '';
-            // Cloudflare Worker 和 AllOrigins 返回 JSON，CorsProxy 返回 Text
-            if (proxyUrl.includes('workers.dev') || proxyUrl.includes('allorigins')) {
-                const data = await response.json();
-                if (proxyUrl.includes('workers.dev')) {
-                    if (data.title) {
-                        console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`);
-                        return data.title;
-                    }
-                    continue; // Worker 没返回 title
-                }
-                html = data.contents;
-            } else {
-                html = await response.text();
+        if (response.ok) {
+            const data = await response.json();
+            if (data.title) {
+                console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`);
+                return data.title;
             }
-
-            if (!html) continue;
-
-            // 提取标题 (针对 CorsProxy/AllOrigins HTML)
-            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-            if (titleMatch?.[1]) {
-                const title = decodeHtmlEntities(titleMatch[1].trim());
-                console.log(`[CORS代理] 获取到标题: ${title}`);
-                return title;
-            }
-        } catch (err) {
-            console.warn(`[代理请求失败]: ${proxyUrl}`, err);
         }
+    } catch (err) {
+        console.warn(`[Worker请求失败]: ${workerUrl}`, err);
     }
 
     return null;
 }
-}
 
-/**
- * 简单解码 HTML 实体
- */
-function decodeHtmlEntities(text: string): string {
-    const map: Record<string, string> = {
-        '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' '
-    };
-    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&nbsp;/g, m => map[m] || m);
-}
+
 
 /**
  * 清理平台特有的冗长标题格式
