@@ -284,6 +284,13 @@ export async function classifyContent(
         // 尝试获取网页标题 (Worker 优先)
         let rawTitle = await fetchPageTitle(extractedUrl);
 
+        // 客户端二次校验：如果 Worker 返回了无效标题 (反爬拦截页)，也视为失败
+        const invalidPatterns = ['该页面不存在', '访问受限', 'Security Check', 'Just a moment', '验证码', '403 Forbidden', '404 Not Found'];
+        if (rawTitle && invalidPatterns.some(p => rawTitle!.includes(p))) {
+            console.warn(`[Client] 检测到无效标题: "${rawTitle}"，触发兜底`);
+            rawTitle = null;
+        }
+
         // 如果 Worker 失败 (可能是微信/知乎反爬)，尝试 LLM 联网兜底
         if (!rawTitle && isApiConfigured(config)) {
             rawTitle = await fetchTitleViaLLM(extractedUrl, config);
