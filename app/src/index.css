@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+@theme {
+  /* Apple Web Tech Tones */
+  --color-bg-app: #F5F5F7;
+  --color-bg-sidebar: rgba(245, 245, 247, 0.8);
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F5F5F7;
+  --color-border: #E5E5EA;
+  --color-border-hover: #D1D1D6;
+
+  --color-ink: #1D1D1F;
+  --color-ink-secondary: #86868B;
+  --color-ink-tertiary: #CECED2;
+
+  --color-accent: #0071E3;
+  --color-accent-hover: #0077ED;
+
+  /* Status Colors */
+  --color-green: #34C759;
+  --color-orange: #FF9F0A;
+  --color-red: #FF3B30;
+  --color-purple: #AF52DE;
+  --color-blue: #0071E3;
+  --color-gray: #8E8E93;
+
+  /* Tag Backgrounds */
+  --bg-tag-blue: rgba(0, 113, 227, 0.1);
+  --bg-tag-orange: rgba(255, 149, 0, 0.1);
+  --bg-tag-green: rgba(52, 199, 89, 0.1);
+  --bg-tag-purple: rgba(175, 82, 222, 0.1);
+  --bg-tag-gray: rgba(142, 142, 147, 0.1);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
+
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-bg-app);
+}
+
+body {
+  background-color: var(--color-bg-app);
+  color: var(--color-ink);
+  min-height: 100vh;
+}
+
+/* ---- Layout Helpers ---- */
+.glass-sidebar {
+  background: var(--color-bg-sidebar);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.macos-input {
+  background: #FFFFFF;
+  border: 1px solid #D1D1D6;
+  border-radius: 6px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.macos-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2);
+  outline: none;
+}
+
+.sidebar-item {
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  transition: all 0.1s;
+}
+
+.sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-ink);
+}
+
+.sidebar-item-active {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* ---- Desktop Card ---- */
+.desktop-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.desktop-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Hover Actions - Visible on group hover */
+.card-actions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.desktop-card:hover .card-actions {
+  opacity: 1;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Always show actions on mobile */
+  .desktop-card:active {
+    transform: scale(0.98);
+  }
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
