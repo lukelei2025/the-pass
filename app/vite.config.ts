@@ -10,11 +10,11 @@ export default defineConfig({
     fetchTitlePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: '数字操作台',
-        short_name: '操作台',
-        description: '信息流转的临时操作台，24小时内必须处理',
+        name: 'Information Workbench',
+        short_name: 'Workbench',
+        description: 'Your Personal Information Workbench',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
