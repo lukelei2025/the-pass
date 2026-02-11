@@ -126,57 +126,6 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
     return null;
 }
 
-/**
- * 策略 3: LLM 联网搜索 (终极兜底)
- * 当 Worker 失败时 (如微信反爬)，调用 GLM-4 的 web_search 能力去获取标题
- */
-async function fetchTitleViaLLM(url: string, config: LLMConfig): Promise<string | null> {
-    if (!isApiConfigured(config)) return null;
-
-    try {
-        console.log(`[LLM 联网兜底] 尝试获取标题: ${url}`);
-        const response = await fetch(GLM_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'glm-4', // 必须使用支持联网的模型
-                messages: [
-                    {
-                        role: 'user',
-                        content: `请访问此链接并提取标题：${url}\n\n严格要求：\n1. 必须是该具体链接页面的标题，不要根据关键词搜索其他内容。\n2. 如果无法直接访问或页面已删除/被拦截，请直接返回 "null"。\n3. 不要包含任何解释、标点或引号，只返回纯文本标题。`
-                    }
-                ],
-                tools: [
-                    {
-                        type: "web_search",
-                        web_search: {
-                            enable: true // 开启联网
-                        }
-                    }
-                ],
-                temperature: 0.1,
-                max_tokens: 100,
-            }),
-        });
-
-        if (!response.ok) return null;
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
-
-        if (content && content !== 'null' && !content.includes('无法访问')) {
-            // 清理可能包含的引号
-            return content.replace(/^["']|["']$/g, '');
-        }
-    } catch (err) {
-        console.warn('[LLM 联网兜底] 失败:', err);
-    }
-    return null;
-}
-
 
 
 /**
@@ -282,19 +231,7 @@ export async function classifyContent(
         // 尝试获取网页标题 (仅用于显示，不再用于分类逻辑，分类逻辑看用户原始输入)
         // 只有当用户没有提供上下文时，这个标题才会在分类时起到关键补充作用
         // 尝试获取网页标题 (Worker 优先)
-        let rawTitle = await fetchPageTitle(extractedUrl);
-
-        // 客户端二次校验：如果 Worker 返回了无效标题 (反爬拦截页)，也视为失败
-        const invalidPatterns = ['该页面不存在', '访问受限', 'Security Check', 'Just a moment', '验证码', '403 Forbidden', '404 Not Found'];
-        if (rawTitle && invalidPatterns.some(p => rawTitle!.includes(p))) {
-            console.warn(`[Client] 检测到无效标题: "${rawTitle}"，触发兜底`);
-            rawTitle = null;
-        }
-
-        // 如果 Worker 失败 (可能是微信/知乎反爬)，尝试 LLM 联网兜底
-        if (!rawTitle && isApiConfigured(config)) {
-            rawTitle = await fetchTitleViaLLM(extractedUrl, config);
-        }
+        const rawTitle = await fetchPageTitle(extractedUrl);
 
         if (rawTitle) {
             metadata.title = cleanPlatformTitle(rawTitle, extractedUrl);
