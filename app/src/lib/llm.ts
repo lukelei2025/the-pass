@@ -146,7 +146,7 @@ async function fetchTitleViaLLM(url: string, config: LLMConfig): Promise<string 
                 messages: [
                     {
                         role: 'user',
-                        content: `请访问此链接并提取标题：${url}\n要求：只返回标题文本，不要包含任何解释或标点。如果无法访问，返回"null"。`
+                        content: `请访问此链接并提取标题：${url}\n\n严格要求：\n1. 必须是该具体链接页面的标题，不要根据关键词搜索其他内容。\n2. 如果无法直接访问或页面已删除/被拦截，请直接返回 "null"。\n3. 不要包含任何解释、标点或引号，只返回纯文本标题。`
                     }
                 ],
                 tools: [
