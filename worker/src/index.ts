@@ -4,10 +4,12 @@
  */
 
 const USER_AGENTS = [
-    // 策略 1: 浏览器 UA — 适合微信、知乎等传统 SSR 网站
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    // 策略 2: Googlebot UA — 适合飞书、Notion 等 SPA（对爬虫返回 SSR 页面）
+    // 策略 1: Googlebot UA — 优先尝试！
+    // 对于飞书/Notion 等 SPA，Googlebot 能直接获取 SSR 内容，速度极快且无跳转
     'Googlebot/2.1 (+http://www.google.com/bot.html)',
+    // 策略 2: 浏览器 UA — 备用
+    // 适合微信、知乎等对 Googlebot 屏蔽但允许浏览器的传统网站
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ];
 
 function decodeEntities(text) {
