@@ -28,8 +28,8 @@ function extractTitle(html: string): string | null {
     const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
     if (ogMatch?.[1]) return decodeEntities(ogMatch[1].trim());
 
-    // 2. WeChat 特有: var msg_title
-    const msgMatch = html.match(/var\s+msg_title\s*=\s*["']([^"']+)["']/);
+    // 2. WeChat 特有: msg_title (兼容 var msg_title 和 window.msg_title)
+    const msgMatch = html.match(/msg_title\s*=\s*(?:window\.title\s*=\s*)?["']([^"']+)["']/);
     if (msgMatch?.[1]) return decodeEntities(msgMatch[1].trim());
 
     // 3. <title> 标签 (必须非空)
