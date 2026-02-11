@@ -30,8 +30,9 @@ function extractTitle(html) {
     const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
     if (ogMatch && ogMatch[1]) return decodeEntities(ogMatch[1].trim());
 
-    // 2. WeChat 特有: var msg_title
-    const msgMatch = html.match(/var\s+msg_title\s*=\s*["']([^"']+)["']/);
+    // 2. WeChat 特有: var msg_title 或 window.msg_title
+    // 兼容: var msg_title = '...'; window.msg_title = '...'; window.msg_title = window.title = '...';
+    const msgMatch = html.match(/msg_title\s*=\s*(?:window\.title\s*=\s*)?["']([^"']+)["']/);
     if (msgMatch && msgMatch[1]) return decodeEntities(msgMatch[1].trim());
 
     // 3. <title> 标签
@@ -74,6 +75,8 @@ export default {
             });
         }
 
+        let lastDebugHtml = "";
+
         // 依次尝试每种 User-Agent
         for (const ua of USER_AGENTS) {
             try {
@@ -93,9 +96,15 @@ export default {
                 if (!response.ok) continue;
 
                 const html = await response.text();
+                lastDebugHtml = html.substring(0, 500); // Capture for debug
                 const title = extractTitle(html);
 
                 if (title) {
+                    // 检查是否为无效标题 (如微信对 Googlebot 返回 404/拦截图)
+                    if (title.includes("该页面不存在") || title.includes("访问受限") || title.includes("Just a moment")) {
+                        // 继续尝试下一个 UA
+                        continue;
+                    }
                     return new Response(JSON.stringify({ title }), {
                         headers: {
                             "Content-Type": "application/json",
