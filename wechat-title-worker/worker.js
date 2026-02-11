@@ -77,36 +77,40 @@ function extractAuthorInfo(html) {
         author: null,       // 文章作者
     };
 
-    // 1. 公众号名称 - 多重策略 (优先级：JsDecode > JS Object > JS var > DOM > Meta)
+    // 1. 公众号名称 - 多重策略 (优先级：JsDecode > htmlDecode > JS Object > JS var > DOM > Meta)
 
     // 策略 A: 匹配 JsDecode 包装的内容 (e.g. nickname: JsDecode('...'))
-    // 示例: nickname: JsDecode('星期一研究室')
     const jsDecodeMatch = html.match(/nickname\s*:\s*JsDecode\(['"]([^'"]+)['"]\)/i);
 
-    // 策略 B: 匹配 JSON/Object 属性 (e.g. nickname: '星期一研究室')
-    const jsObjMatch1 = html.match(/nickname\s*:\s*['"]([^'"]+)['"]/i);
+    // 策略 B: 匹配 var nickname = htmlDecode("...") (常见的旧版/PC版结构)
+    const accountMatchHtmlDecode = html.match(/var\s+nickname\s*=\s*htmlDecode\(['"]([^'"]+)['"]\)/i);
+
+    // 策略 C: 匹配 JSON/Object 属性 (e.g. nickname: '星期一研究室')
+    // ⚠️ 排除 "data-miniprogram-nickname" 这种占位符
+    const jsObjMatch1 = html.match(/nickname\s*:\s*['"]((?!data-miniprogram-nickname)[^'"]+)['"]/i);
     const jsObjMatch2 = html.match(/brand_name\s*:\s*['"]([^'"]+)['"]/i);
 
-    // 策略 C (旧): 匹配 var 变量
+    // 策略 D (旧): 匹配 var 变量
     const accountMatch1 = html.match(/var\s+nickname\s*=\s*"([^"]+)"/i);
     const accountMatch2 = html.match(/"nick_name"\s*:\s*"([^"]+)"/i);
 
-    // 策略 D: DOM 匹配
+    // 策略 E: DOM 匹配
     const domMatch = html.match(/<strong[^>]*class="[^"]*profile_nickname[^"]*"[^>]*>(.*?)<\/strong>/i) ||
         html.match(/id="js_name">\s*([^<]+?)\s*<\/a>/i) ||
         html.match(/id="js_name">\s*([^<]+?)\s*<\/strong>/i);
 
-    // 策略 E (兜底): Meta 标签 (注意：og:site_name 经常是 "微信公众平台"，优先级应最低)
+    // 策略 F (兜底): Meta 标签
     const accountMatch3 = html.match(/<meta\s+property="og:site_name"\s+content="([^"]+)"/i);
 
     // 优先级排序：
     result.account = jsDecodeMatch?.[1] ||
+        accountMatchHtmlDecode?.[1] ||
         jsObjMatch1?.[1] ||
         jsObjMatch2?.[1] ||
         accountMatch1?.[1] ||
         accountMatch2?.[1] ||
         domMatch?.[1]?.trim() ||
-        accountMatch3?.[1] || // 最低优先级
+        accountMatch3?.[1] ||
         null;
 
     // 2. 文章作者 (msg_author 字段)
@@ -126,8 +130,6 @@ function extractAuthorInfo(html) {
             delete result[key];
         } else {
             result[key] = result[key].replace(/&nbsp;/g, ' ').trim();
-            // 如果也是 "微信公众平台"，且不是 Meta 来源的（Meta 来源已经是最低优了），可能也需要过滤？
-            // 但暂时保留，除非明确是错误的。
         }
     });
 
