@@ -95,8 +95,9 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
                 const data = await response.json();
                 if (data.title) {
                     console.log(`[WeChat Worker] 获取到标题: ${data.title}`);
-                    // 如果有公众号名称，也可以考虑拼接到标题里，比如 "Title - Account"
-                    return data.account ? `${data.title} - ${data.account}` : data.title;
+                    // 优先使用公众号名称 (account)，其次是作者 (author)
+                    const authorName = data.author?.account || data.author?.author || data.account;
+                    return authorName ? `${data.title} - ${authorName}` : data.title;
                 }
             }
         } catch (err) {
