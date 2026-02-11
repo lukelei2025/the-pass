@@ -71,8 +71,8 @@ export const CLASSIFICATION_RULES = `
 - 特征：明确的任务执行意向。
 
 **🏠 personal（个人）：**
-- 触发词：买、购物、快递、体检、健身、家里、聚餐、出行、预约、挂号、还款、缴费、签证、搬家
-- 特征：涉及私生活、家庭支出、个人事务。
+- 触发词：买、购物、快递、体检、健身、家里、聚餐、出行、预约、挂号、看病、医院、吃药、还款、缴费、签证、搬家
+- 特征：涉及私生活、家庭支出、个人事务、医疗健康。
 
 **🔗 article（待看链接）：**
 - 触发词：文章、视频、看看、稍后看、学习、了解、推荐阅读
@@ -95,14 +95,29 @@ export const CLASSIFICATION_RULES = `
 
 ---
 
+## 🧐 二度评判机制 (Self-Correction Protocol)
+
+**在输出最终结果前，必须强制执行以下思考过程：**
+
+1.  **初判**：根据关键词和链接得出第一个结论。
+2.  **反问 (Critique)**：
+    - "这个分类真的贴切吗？"
+    - "用户是不是在记录个人私事（如看病、修车），而被我误判为了 Other？"
+    - "虽然有链接，但用户是不是只为了备忘去买东西（Personal）？"
+3.  **终判**：如果反问发现不合理，立即修正为更符合用户意图的分类。
+
+---
+
 ## 输出格式
 
-**只返回分类标识，不要返回任何其他内容：**
-- inspiration
-- work
-- personal
-- article
-- other
+**请返回 JSON 格式：**
+
+{
+    "reasoning": "你的思考和二度评判过程",
+    "category": "final_category"
+}
+
+
 
 ---
 
@@ -121,6 +136,7 @@ export const CLASSIFICATION_RULES = `
 | "看下这篇 B站 剪辑教程" | article | 有明确的阅读/学习意图 |
 | "记得买牙刷" | personal | 购物、日常事务 |
 | "预约下周三体检" | personal | 个人健康事务 |
+| "12号上午去医院挂号" | personal | 具体的个人医疗事务 |
 `;
 
 export default CLASSIFICATION_RULES;

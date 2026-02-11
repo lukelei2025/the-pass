@@ -106,17 +106,21 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
 
       {/* Desktop Hover Actions */}
       <div className="hidden md:flex absolute bottom-0 left-0 right-0 p-2 bg-white/95 backdrop-blur-sm border-t border-[var(--color-border)] opacity-0 group-hover:opacity-100 transition-opacity duration-200 gap-1.5">
-        <button onClick={(e) => { e.stopPropagation(); handleAction('cooked'); }} title="Fini (Cmd+Enter)" className="flex-1 h-8 flex items-center justify-center rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-green)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+        <button onClick={(e) => { e.stopPropagation(); handleAction('cooked'); }} title="Fini (Cmd+Enter)" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-green)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+          <span className="text-[10px] font-semibold">Fini</span>
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title="Tick" className="flex-1 h-8 flex items-center justify-center rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
+        <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title="Tick" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
+          <span className="text-[10px] font-semibold">Tick</span>
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleAction('frozen'); }} title="Stow" className="flex-1 h-8 flex items-center justify-center rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
+        <button onClick={(e) => { e.stopPropagation(); handleAction('frozen'); }} title="Stow" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
+          <span className="text-[10px] font-semibold">Stow</span>
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleAction('composted'); }} title="Void" className="flex-1 h-8 flex items-center justify-center rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-red)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        <button onClick={(e) => { e.stopPropagation(); handleAction('composted'); }} title="Void" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-red)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          <span className="text-[10px] font-semibold">Void</span>
         </button>
       </div>
 

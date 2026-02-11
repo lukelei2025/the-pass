@@ -79,6 +79,31 @@ export function identifyPlatform(url: string): { name: string; category: Categor
  * 2. 生产环境: 使用公共 CORS 代理 (corsproxy.io 或 allorigins)
  */
 async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | null> {
+    const isWeChat = url.includes('mp.weixin.qq.com');
+
+    // 策略 0: 如果是微信公众号，优先使用专用 Worker (抗反爬)
+    if (isWeChat) {
+        // TODO: 请替换为你实际部署后的 Worker URL
+        const wechatWorkerUrl = `https://wechat-title-api.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            const response = await fetch(wechatWorkerUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.title) {
+                    console.log(`[WeChat Worker] 获取到标题: ${data.title}`);
+                    // 如果有公众号名称，也可以考虑拼接到标题里，比如 "Title - Account"
+                    return data.account ? `${data.title} - ${data.account}` : data.title;
+                }
+            }
+        } catch (err) {
+            console.warn('[WeChat Worker] 请求失败:', err);
+        }
+    }
+
     // 策略 1: 本地 Vite 开发服务器代理 (仅 Dev 环境可用)
     if (import.meta.env.DEV) {
         try {
@@ -101,8 +126,7 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
         }
     }
 
-    // 策略 2: Cloudflare Worker 代理 (生产环境唯一指定方案)
-    // 自建 Worker 支持自定义 UA，专治飞书/微信等反爬
+    // 策略 2: 通用 Cloudflare Worker 代理 (生产环境兜底)
     const workerUrl = `https://workbench-title-proxy.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
 
     try {
@@ -190,13 +214,13 @@ function buildEnhancedPrompt(rawData: string, metadata: ContentMetadata): string
         prompt += `)\n`;
     }
 
-    prompt += `\n请根据以上分类规则，分析用户的原始输入，只返回分类标识（inspiration/work/personal/article/other），不要返回其他任何内容。`;
+    prompt += `\n请严格按照分类规则执行“二度评判”，并以 JSON 格式返回结果。`;
 
     return prompt;
 }
 
 /**
- * 智能分类 - 增强版
+ * 智能分类 - 增强版 (支持思维链自查)
  * 
  * 架构重构：
  * 1. 代码层：只负责提取 URL、识别平台、抓取网页标题（用于 UI 展示）
@@ -211,8 +235,6 @@ export async function classifyContent(
     const isLink = !!extractedUrl;
 
     // 初始化元数据 - 始终保留 raw content 供后续使用
-    // 注意：如果包含链接，content 字段会被替换为 clean URL (为了 UI 卡片点击)，
-    // 但我们会把原始输入传给 LLM 进行分类判断
     const metadata: ContentMetadata = {
         content: isLink ? extractedUrl! : content,
         originalUrl: isLink ? extractedUrl! : undefined,
@@ -221,18 +243,13 @@ export async function classifyContent(
 
     // 2. 如果是链接，提取更多 UI 展示所需信息
     if (isLink && extractedUrl) {
-        // 识别平台
         const platform = identifyPlatform(extractedUrl);
         if (platform) {
             metadata.platform = platform.name;
             metadata.source = platform.name;
         }
 
-        // 尝试获取网页标题 (仅用于显示，不再用于分类逻辑，分类逻辑看用户原始输入)
-        // 只有当用户没有提供上下文时，这个标题才会在分类时起到关键补充作用
-        // 尝试获取网页标题 (Worker 优先)
         const rawTitle = await fetchPageTitle(extractedUrl);
-
         if (rawTitle) {
             metadata.title = cleanPlatformTitle(rawTitle, extractedUrl);
             console.log(`[标题获取成功] ${metadata.title}`);
@@ -240,18 +257,13 @@ export async function classifyContent(
     }
 
     // 3. 开始分类流程
-
-    // 如果 API 未配置
     if (!isApiConfigured(config)) {
-        // 回退逻辑：有链接且识别到平台 → 用平台默认分类；否则 → article
         if (isLink && metadata.platform) {
             const platformInfo = Object.values(PLATFORM_PATTERNS).find(p => p.name === metadata.platform);
             if (platformInfo) {
-                console.log(`LLM 未配置，使用平台默认分类: ${platformInfo.category}`);
                 return { category: platformInfo.category, metadata };
             }
         }
-        console.log('LLM API 未配置，使用默认规则');
         return { category: isLink ? 'article' : 'other', metadata };
     }
 
@@ -273,8 +285,8 @@ export async function classifyContent(
                         content: enhancedPrompt,
                     },
                 ],
-                temperature: 0.1,
-                max_tokens: 20,
+                temperature: 0.1, // 保持低温度以稳定输出 JSON
+                max_tokens: 2000,  // 增加 Token 数以容纳 reasoning，防止截断
             }),
         });
 
@@ -284,15 +296,33 @@ export async function classifyContent(
         }
 
         const data = await response.json();
-        const result = data.choices?.[0]?.message?.content?.trim().toLowerCase();
+        let rawContent = data.choices?.[0]?.message?.content?.trim();
+
+        // 清理可能存在的 Markdown 代码块标记
+        rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+
+        console.log('[LLM Raw Output]:', rawContent);
+
+        let resultCategory: Category = 'other';
+        try {
+            const parsed = JSON.parse(rawContent);
+            resultCategory = parsed.category?.toLowerCase();
+            console.log('🤖 [AI 自查思考]:', parsed.reasoning);
+        } catch (e) {
+            // 兜底：如果 JSON 解析失败，尝试直接匹配单词
+            console.warn('JSON 解析失败，尝试降级匹配', e);
+            const validCategories: Category[] = ['inspiration', 'work', 'personal', 'article', 'other'];
+            if (validCategories.includes(rawContent as Category)) {
+                resultCategory = rawContent as Category;
+            }
+        }
 
         // 验证返回的分类是否有效
         const validCategories: Category[] = ['inspiration', 'work', 'personal', 'article', 'other'];
-        if (result && validCategories.includes(result as Category)) {
-            return { category: result as Category, metadata };
+        if (validCategories.includes(resultCategory)) {
+            return { category: resultCategory, metadata };
         }
 
-        console.log('LLM 返回的分类无效:', result);
         return { category: isLink ? 'article' : 'other', metadata };
     } catch (error) {
         console.error('LLM 分类失败:', error);
