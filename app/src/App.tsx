@@ -24,6 +24,11 @@ function AppContent() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Cleanup legacy local storage
+  useEffect(() => {
+    localStorage.removeItem('llmApiKey');
+  }, []);
+
   // Initialize store when user logs in
   useEffect(() => {
     if (user) {

@@ -4,13 +4,11 @@
  */
 
 import type { Category } from '../types';
-import { CLASSIFICATION_RULES } from './classification-rules';
 
-const GLM_API_URL = 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions';
 
 export interface LLMConfig {
-    apiKey: string;
     enabled: boolean;
+    // apiKey removed as it's now backend-only
 }
 
 export interface ContentMetadata {
@@ -18,7 +16,7 @@ export interface ContentMetadata {
     title?: string;
     source?: string;
     platform?: string;
-    originalUrl?: string; // 只有当内容包含链接时才会有此字段
+    originalUrl?: string;
     isLink: boolean;
 }
 
@@ -70,13 +68,6 @@ export function identifyPlatform(url: string): { name: string; category: Categor
 
 /**
  * 尝试获取网页标题
- * 策略: 优先使用本地 Vite 代理（绕过 CORS），失败则回退到 AllOrigins
- */
-/**
- * 尝试获取网页标题
- * 策略:
- * 1. 开发环境: 使用本地 Vite 代理 (最可靠)
- * 2. 生产环境: 使用公共 CORS 代理 (corsproxy.io 或 allorigins)
  */
 async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | null> {
     const isWeChat = url.includes('mp.weixin.qq.com');
@@ -151,13 +142,8 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
     return null;
 }
 
-
-
 /**
  * 清理平台特有的冗长标题格式
- * - GitHub: "GitHub - owner/repo: 很长的 About 描述" → "owner/repo"
- * - 知乎: "标题 - 知乎" → "标题"
- * - 飞书: "标题 - 飞书云文档" → "标题"
  */
 function cleanPlatformTitle(title: string, url: string): string {
     // GitHub: 提取 owner/repo，去掉冗长的 About
@@ -177,7 +163,6 @@ function cleanPlatformTitle(title: string, url: string): string {
 
 /**
  * 简单提取文本中的 URL
- * 不再负责解析标题或用户说明，这两者交给 LLM 在分类时处理
  */
 function extractUrl(input: string): string | null {
     const match = input.match(/(https?:\/\/[^\s]+)/);
@@ -185,47 +170,12 @@ function extractUrl(input: string): string | null {
 }
 
 /**
- * 检查 API 是否已配置
+ * 智能分类 - 增强版 (后端 Cloud Functions)
  */
-export function isApiConfigured(config: LLMConfig): boolean {
-    return config.enabled && config.apiKey.length > 0;
-}
+const CLOUDFLARE_WORKER_URL = 'https://workbench-title-proxy.lukelei-workbench.workers.dev';
 
 /**
- * 构建增强版分类 prompt
- * 使用完整的分类规则 SOP
- */
-function buildEnhancedPrompt(rawData: string, metadata: ContentMetadata): string {
-    // 使用完整的分类规则 SOP
-    let prompt = CLASSIFICATION_RULES + '\n\n---\n\n## 待分类内容\n\n';
-
-    // 核心改变：直接把用户原始输入作为一个整体传给 LLM
-    // 让 LLM 自己去理解其中的 URL、标题、还是用户意图
-    prompt += `用户原始输入:\n"""\n${rawData}\n"""\n\n`;
-
-    // 补充一些代码层提取到的事实信息，供 LLM 参考（但以原始输入为主）
-    if (metadata.isLink) {
-        prompt += `(系统检测到的事实信息：包含链接 ${metadata.originalUrl}`;
-        if (metadata.platform) {
-            prompt += `，来自平台 ${metadata.platform}`;
-        }
-        if (metadata.title) {
-            prompt += `，网页标题 "${metadata.title}"`;
-        }
-        prompt += `)\n`;
-    }
-
-    prompt += `\n请严格按照分类规则执行“二度评判”，并以 JSON 格式返回结果。`;
-
-    return prompt;
-}
-
-/**
- * 智能分类 - 增强版 (支持思维链自查)
- * 
- * 架构重构：
- * 1. 代码层：只负责提取 URL、识别平台、抓取网页标题（用于 UI 展示）
- * 2. 逻辑层：将【用户完整原始输入】传给 LLM，由 LLM 根据规则判断分类
+ * 智能分类 - 增强版 (Cloudflare Worker)
  */
 export async function classifyContent(
     content: string,
@@ -235,7 +185,7 @@ export async function classifyContent(
     const extractedUrl = extractUrl(content);
     const isLink = !!extractedUrl;
 
-    // 初始化元数据 - 始终保留 raw content 供后续使用
+    // 初始化元数据
     const metadata: ContentMetadata = {
         content: isLink ? extractedUrl! : content,
         originalUrl: isLink ? extractedUrl! : undefined,
@@ -257,8 +207,8 @@ export async function classifyContent(
         }
     }
 
-    // 3. 开始分类流程
-    if (!isApiConfigured(config)) {
+    // 3. 检查是否开启自动分类
+    if (!config.enabled) {
         if (isLink && metadata.platform) {
             const platformInfo = Object.values(PLATFORM_PATTERNS).find(p => p.name === metadata.platform);
             if (platformInfo) {
@@ -268,84 +218,50 @@ export async function classifyContent(
         return { category: isLink ? 'external' : 'others', metadata };
     }
 
-    // 4. 调用 LLM 进行分类 (传入完整原始 content)
-    const enhancedPrompt = buildEnhancedPrompt(content, metadata);
-
+    // 4. 调用 Cloudflare Worker (Classify)
     try {
-        const response = await fetch(GLM_API_URL, {
+        const response = await fetch(CLOUDFLARE_WORKER_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`,
             },
             body: JSON.stringify({
-                model: 'glm-4',
-                messages: [
-                    {
-                        role: 'user',
-                        content: enhancedPrompt,
-                    },
-                ],
-                temperature: 0.1, // 保持低温度以稳定输出 JSON
-                max_tokens: 2000,  // 增加 Token 数以容纳 reasoning，防止截断
+                content,
+                metadata
             }),
         });
 
         if (!response.ok) {
-            console.error('GLM API 请求失败:', response.status, response.statusText);
+            console.error('Worker Classify Failed:', response.status);
             return { category: isLink ? 'external' : 'others', metadata };
         }
 
-        const data = await response.json();
-        let rawContent = data.choices?.[0]?.message?.content?.trim();
+        const data = await response.json() as any;
+        console.log('[Worker Classify Result]:', data);
 
-        // 清理可能存在的 Markdown 代码块标记
-        rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-
-        console.log('[LLM Raw Output]:', rawContent);
-
-        let resultCategory: Category = 'others';
-        try {
-            const parsed = JSON.parse(rawContent);
-            resultCategory = parsed.category?.toLowerCase();
-            console.log('🤖 [AI 自查思考]:', parsed.reasoning);
-        } catch (e) {
-            // 兜底：如果 JSON 解析失败，尝试直接匹配单词
-            console.warn('JSON 解析失败，尝试降级匹配', e);
+        if (data && data.category) {
+            const resultCategory = data.category.toLowerCase();
             const validCategories: Category[] = ['ideas', 'work', 'personal', 'external', 'others'];
-            // 兼容旧的 fallback 逻辑，但映射到新的 key
+
+            if (validCategories.includes(resultCategory)) {
+                return { category: resultCategory as Category, metadata };
+            }
+
+            // Fallback mappings
             const mapOld: Record<string, Category> = {
                 'inspiration': 'ideas',
                 'article': 'external',
                 'other': 'others'
             };
-
-            if (validCategories.includes(rawContent as Category)) {
-                resultCategory = rawContent as Category;
-            } else if (mapOld[rawContent]) {
-                resultCategory = mapOld[rawContent];
+            if (mapOld[resultCategory]) {
+                return { category: mapOld[resultCategory], metadata };
             }
         }
 
-        // 验证返回的分类是否有效
-        const validCategories: Category[] = ['ideas', 'work', 'personal', 'external', 'others'];
-        if (validCategories.includes(resultCategory)) {
-            return { category: resultCategory, metadata };
-        }
-
-        // 尝试映射旧 key (如果 LLM 偶尔输出旧的)
-        const mapOld: Record<string, Category> = {
-            'inspiration': 'ideas',
-            'article': 'external',
-            'other': 'others'
-        };
-        if (mapOld[resultCategory]) {
-            return { category: mapOld[resultCategory], metadata };
-        }
-
         return { category: isLink ? 'external' : 'others', metadata };
+
     } catch (error) {
-        console.error('LLM 分类失败:', error);
+        console.error('Worker Call Failed:', error);
         return { category: isLink ? 'external' : 'others', metadata };
     }
 }
@@ -353,28 +269,4 @@ export async function classifyContent(
 /**
  * 测试 API 连接
  */
-export async function testApiConnection(apiKey: string): Promise<{ success: boolean; message: string }> {
-    try {
-        const response = await fetch(GLM_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'glm-4',
-                messages: [{ role: 'user', content: '你好' }],
-                max_tokens: 10,
-            }),
-        });
 
-        if (response.ok) {
-            return { success: true, message: 'API 连接成功！' };
-        } else {
-            const error = await response.json();
-            return { success: false, message: `API 错误: ${error.error?.message || response.statusText}` };
-        }
-    } catch (error) {
-        return { success: false, message: `连接失败: ${error instanceof Error ? error.message : '未知错误'}` };
-    }
-}

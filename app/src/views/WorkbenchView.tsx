@@ -27,7 +27,6 @@ export default function WorkbenchView() {
     setIsClassifying(true);
 
     const { category, metadata } = await classifyContent(inputText, {
-      apiKey: localStorage.getItem('llmApiKey') || '',
       enabled: settings.llmAutoClassify,
     });
 
@@ -92,7 +91,7 @@ export default function WorkbenchView() {
   };
 
   const pendingCount = pendingItems.length;
-  const llmConfigured = settings.llmAutoClassify && (localStorage.getItem('llmApiKey') || '').length > 0;
+  const llmConfigured = settings.llmAutoClassify;
 
   return (
     <div className="space-y-8 pb-20">

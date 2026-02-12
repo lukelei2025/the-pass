@@ -12,7 +12,7 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ];
 
-function decodeEntities(text) {
+function decodeEntities(text: string | null) {
     if (!text) return '';
     return text
         .replace(/&amp;/g, '&')
@@ -23,7 +23,7 @@ function decodeEntities(text) {
         .replace(/&nbsp;/g, ' ');
 }
 
-function extractTitle(html) {
+function extractTitle(html: string | null) {
     if (!html) return null;
 
     // 1. og:title (最可靠)
@@ -49,14 +49,171 @@ function extractTitle(html) {
     return null;
 }
 
+/**
+ * 专门处理 Twitter/X 的 oEmbed 抓取
+ * 官方文档: https://developer.twitter.com/en/docs/twitter-for-websites/oembed-api
+ */
+async function fetchTwitterOEmbed(url: string): Promise<string | null> {
+    try {
+        const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
+        const response = await fetch(oembedUrl);
+
+        if (!response.ok) return null;
+
+        const data = await response.json() as any;
+        const authorName = data.author_name;
+        const html = data.html || '';
+
+        // 从 HTML blockquote 中提取推文内容
+        // 格式通常为: <p ...>Content</p>&mdash; Author (@handle) ...
+        let content = html.replace(/<[^>]+>/g, ' ').trim();
+
+        // 简单的清理，移除末尾的日期
+        content = content.replace(/\s\([^\)]+\)$/, '');
+
+        if (authorName && content) {
+            // 如果内容太长，截断
+            const shortContent = content.length > 50 ? content.substring(0, 50) + '...' : content;
+            return `${authorName}: "${shortContent}"`;
+        }
+
+        return data.title || (authorName ? `Tweet by ${authorName}` : null);
+    } catch (e) {
+        return null;
+    }
+}
+
+
+export interface Env {
+    GLM_API_KEY: string;
+}
+
+const GLM_API_URL = 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions';
+
+async function handleClassify(request: Request, env: Env) {
+    if (request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405 });
+    }
+
+    try {
+        const apiKey = env.GLM_API_KEY;
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: "Server misconfiguration: API key not found" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            });
+        }
+
+        const body = await request.json() as any;
+        const { content, metadata } = body;
+
+        if (!content) {
+            return new Response(JSON.stringify({ error: "Missing content" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            });
+        }
+
+        // Construct the prompt
+        const prompt = `
+你是一个个人信息管理助手。请分析用户输入的内容，将其归类到以下类别之一：
+
+- ideas: 灵感、想法、随笔、笔记
+- work: 工作任务、职业发展、项目相关
+- personal: 个人生活、健康、家庭、娱乐（如电影、游戏、小说）
+- external: 外部链接、文章、视频、资源
+- others: 无法明确归类的其他内容
+
+**分类规则：**
+1. 如果内容是URL链接，优先归类为 'external'。
+2. 包含 "买"、"吃"、"看" (电影/书) 等生活向动词，归类为 'personal'。
+3. 包含 "会议"、"报告"、"代码"、"项目"、"客户" 等工作向词汇，归类为 'work'。
+4. 短语、碎片化想法、备忘录，归类为 'ideas'。
+
+请进行一步步思考 (Chain of Thought)，然后返回 JSON 格式结果。
+
+用户原始输入:
+"""
+${content}
+"""
+
+${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl}, 标题 "${metadata.title || ''}")` : ''}
+
+请严格遵守 JSON 格式返回，不要包含 Markdown 标记：
+{
+  "reasoning": "你的思考过程...",
+  "category": "category_key"
+}
+`;
+
+        const response = await fetch(GLM_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: 'glm-4',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+                temperature: 0.1,
+                max_tokens: 2000,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('GLM API Error:', errorText);
+            return new Response(JSON.stringify({ error: "GLM API Failed", details: errorText }), {
+                status: 500,
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            });
+        }
+
+        const data = await response.json() as any;
+        let rawContent = data.choices?.[0]?.message?.content?.trim();
+
+        // Clean up Markdown code blocks
+        rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+
+        let result;
+        try {
+            result = JSON.parse(rawContent);
+        } catch (e) {
+            console.warn('JSON parse failed', rawContent);
+            result = {
+                category: 'others',
+                reasoning: 'JSON Parse Error, Raw: ' + rawContent
+            };
+        }
+
+        return new Response(JSON.stringify(result), {
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
+        });
+
+    } catch (error: any) {
+        return new Response(JSON.stringify({ error: "Internal Error", details: error.message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+    }
+}
+
 export default {
-    async fetch(request, env, ctx) {
+    async fetch(request: Request, env: Env, ctx: any) {
         // 处理 CORS
         if (request.method === "OPTIONS") {
             return new Response(null, {
                 headers: {
                     "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, OPTIONS",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                     "Access-Control-Allow-Headers": "Content-Type",
                 },
             });
@@ -64,6 +221,12 @@ export default {
 
         const url = new URL(request.url);
         const targetUrl = url.searchParams.get("url");
+
+        // 如果 content-type 是 json 或者是 /classify 路径，则走分类逻辑
+        // 但为了简单，如果 url 参数不存在且是 POST，我们就认为是分类请求
+        if (request.method === "POST" && !targetUrl) {
+            return handleClassify(request, env);
+        }
 
         if (!targetUrl) {
             return new Response(JSON.stringify({ error: "Missing url parameter" }), {
@@ -73,6 +236,21 @@ export default {
                     "Access-Control-Allow-Origin": "*",
                 },
             });
+        }
+
+        // 特殊处理 Twitter / X
+        if (targetUrl.includes('x.com/') || targetUrl.includes('twitter.com/')) {
+            const twitterTitle = await fetchTwitterOEmbed(targetUrl);
+            if (twitterTitle) {
+                return new Response(JSON.stringify({ title: twitterTitle }), {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "public, max-age=3600"
+                    },
+                });
+            }
+            // 如果 oembed 失败，继续尝试通用抓取（虽然大概率也会失败）
         }
 
         let lastDebugHtml = "";
@@ -91,7 +269,7 @@ export default {
                         cacheTtl: 3600, // 缓存 1 小时
                         cacheEverything: true,
                     },
-                });
+                } as any); // Type assertion for cf property
 
                 if (!response.ok) continue;
 

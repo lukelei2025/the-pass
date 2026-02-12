@@ -1,28 +1,9 @@
-import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { testApiConnection } from '../lib/llm';
 import { useTranslation } from '../hooks/useTranslation';
 
 export default function SettingsView() {
     const { settings, updateSettings, setCurrentView } = useStore();
-    const [apiKey, setApiKey] = useState(localStorage.getItem('llmApiKey') || '');
-    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-    const [isTesting, setIsTesting] = useState(false);
     const { t, language, setLanguage } = useTranslation();
-
-    const handleSave = async () => {
-        localStorage.setItem('llmApiKey', apiKey);
-        alert(t.common.save + ' Success');
-    };
-
-    const handleTestApi = async () => {
-        if (!apiKey) return;
-        setIsTesting(true);
-        setTestResult(null);
-        const result = await testApiConnection(apiKey);
-        setTestResult(result);
-        setIsTesting(false);
-    };
 
     return (
         <div className="max-w-2xl mx-auto space-y-8 pb-20">
@@ -71,32 +52,6 @@ export default function SettingsView() {
                                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${settings.llmAutoClassify ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[13px] font-medium text-[var(--color-ink)]">{t.settings.apiKeyLabel}</label>
-                            <input
-                                type="password"
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                                placeholder="sk-..."
-                                className="macos-input w-full p-2.5 font-mono text-[13px]"
-                            />
-                        </div>
-
-                        <div className="flex justify-end gap-3 pt-2">
-                            <button onClick={handleTestApi} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                {isTesting ? t.common.loading : t.settings.testConnection}
-                            </button>
-                            <button onClick={handleSave} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                {t.settings.saveKey}
-                            </button>
-                        </div>
-
-                        {testResult && (
-                            <p className={`text-[12px] font-medium ${testResult.success ? 'text-[var(--color-green)]' : 'text-[var(--color-red)]'}`}>
-                                {testResult.message}
-                            </p>
-                        )}
                     </div>
                 </section>
 

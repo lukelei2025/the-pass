@@ -22,4 +22,8 @@ export const googleProvider = new GoogleAuthProvider();
 // Firestore
 export const db = getFirestore(app);
 
+// Functions
+// Functions (Not used - migrated to Cloudflare)
+// export const functions = getFunctions(app);
+
 export default app;
