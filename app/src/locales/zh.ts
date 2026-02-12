@@ -1,5 +1,5 @@
-import { Locale } from './en';
-import { Category } from '../types';
+import type { Locale } from './en';
+import type { Category } from '../types';
 
 export const zh: Locale = {
     // App
