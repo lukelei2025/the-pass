@@ -63,6 +63,13 @@ Only if the user adds a specific note expressing personal intent does it change 
 | Link + "Buy this" | personal | User shopping intent / 购物意图 |
 | Link + "Great idea" | ideas | User inspiration / 灵感意图 |
 
+### 1.5 Specific Platform Rules / 特定平台规则
+
+1.  **Xiaohongshu (Red) / TikTok / Bilibili / YouTube** -> **external**
+    - These are content consumption platforms. Default to external.
+    - 小红书、抖音、B站、YouTube -> **external**
+    - Even if the title contains "idea" or "tutorial", it is external (resource) unless the user says "I want to do this".
+
 ### 2. Keyword Matching / 关键词匹配
 
 **💡 ideas (Inspiration/灵感):**

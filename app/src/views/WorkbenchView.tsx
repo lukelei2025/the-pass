@@ -55,12 +55,30 @@ export default function WorkbenchView() {
       // 但为了 edit 方便，content 应该是用户的 note。
 
       if (userText) {
-        finalContent = userText;
+        // Dedup: Check if userText is just a copy of the title (common in share text)
+        const normalize = (str: string) => str.replace(/[\s\p{P}]+/gu, '').toLowerCase();
+
+        const cleanUserText = normalize(userText);
+        const cleanTitle = title ? normalize(title) : '';
+
+        // Strategy: If the note is contained in the title, or the title is contained in the note,
+        // AND the user didn't explicitly write something different (heuristic), discard it.
+        // For Xiaohongshu specifically, share text often equals title.
+        const isDuplicate = cleanTitle && (cleanUserText.includes(cleanTitle) || cleanTitle.includes(cleanUserText));
+
+        // Special Case: Xiaohongshu often includes long intro text in clipboard share.
+        // User explicitly requested to hide this "gray introduction text".
+        const isXiaohongshu = metadata.platform === '小红书';
+
+        if (isXiaohongshu) {
+          finalContent = ''; // Aggressively clear for Xiaohongshu to avoid clutter
+        } else if (!isDuplicate) {
+          finalContent = userText;
+        } else {
+          finalContent = ''; // Filter out redundant text
+        }
       } else {
-        // 如果没有用户笔记，Content 存什么？
-        // 如果存空字符串，ListItem 需要处理显示逻辑（无 content 时显示 title?）
-        // 鉴于旧数据 content 是 "Title · Note"，为了统一，新数据如果没笔记，Content 为空。
-        // 但为了简单，如果没笔记，Content 可以是空字符串。
+        // If no user note, Content is empty
         finalContent = '';
       }
     } else {

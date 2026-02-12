@@ -163,21 +163,26 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Mobile Bottom Nav */}
+        {/* Mobile Right Side Floating Dock */}
         {isMobile && (
-          <nav className="glass-header sticky bottom-0 z-50 pb-[env(safe-area-inset-bottom)] flex-shrink-0 border-t border-[rgba(0,0,0,0.08)]">
-            <div className="flex justify-around items-center h-[50px]">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentView(item.id)}
-                  className="flex-1 flex flex-col items-center justify-center"
-                >
-                  <svg className={`w-6 h-6 mb-0.5 ${currentView === item.id ? 'text-[var(--color-accent)]' : 'text-[#999]'}`} viewBox="0 0 24 24" fill="currentColor"><path d={item.icon} /></svg>
-                  <span className={`text-[10px] font-medium ${currentView === item.id ? 'text-[var(--color-accent)]' : 'text-[#999]'}`}>{item.label}</span>
-                </button>
-              ))}
-            </div>
+          <nav className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 bg-white/80 backdrop-blur-xl border border-black/5 p-3 rounded-2xl shadow-lg">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className="flex flex-col items-center justify-center gap-1 w-10 h-10 relative group"
+              >
+                <div className={`transition-all duration-200 ${currentView === item.id ? 'scale-110 text-[var(--color-accent)]' : 'text-[#999]'}`}>
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d={item.icon} />
+                  </svg>
+                </div>
+                {/* Optional: Tooltip or indicator if needed, but keeping it clean for now */}
+                {currentView === item.id && (
+                  <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-3 rounded-l-full bg-[var(--color-accent)] opacity-0" />
+                )}
+              </button>
+            ))}
           </nav>
         )}
       </main>

@@ -8,7 +8,12 @@
  * 逻辑整合了原有的通用抓取能力和 twitter-scraper-worker.js 的专用解析能力。
  */
 
+import { getXiaohongshuInfo } from './xiaohongshu';
 import { CLASSIFICATION_RULES } from './classification-rules';
+
+// ==========================================
+// 2. 通用网页抓取逻辑 (Fallback & Default)
+// ==========================================
 
 // 定义 Env 接口
 export interface Env {
@@ -51,26 +56,46 @@ function decodeEntities(text: string | null) {
 function extractTitle(html: string | null) {
     if (!html) return null;
 
+    let title: string | null = null;
+
     // 1. og:title (最可靠)
     const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    if (ogMatch && ogMatch[1]) return decodeEntities(ogMatch[1].trim());
-
-    // 2. WeChat 特有
-    const msgMatch = html.match(/msg_title\s*=\s*(?:window\.title\s*=\s*)?["']([^"']+)["']/);
-    if (msgMatch && msgMatch[1]) return decodeEntities(msgMatch[1].trim());
-
-    // 3. <title> 标签
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch && titleMatch[1]) return decodeEntities(titleMatch[1].trim());
-
-    // 4. 第一个 <h1>
-    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-    if (h1Match && h1Match[1]) {
-        const clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
-        if (clean) return decodeEntities(clean);
+    if (ogMatch && ogMatch[1]) {
+        title = decodeEntities(ogMatch[1].trim());
     }
 
-    return null;
+    // 2. WeChat 特有
+    if (!title) {
+        const msgMatch = html.match(/msg_title\s*=\s*(?:window\.title\s*=\s*)?["']([^"']+)["']/);
+        if (msgMatch && msgMatch[1]) title = decodeEntities(msgMatch[1].trim());
+    }
+
+
+
+    // 3. <title> 标签
+    if (!title) {
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (titleMatch && titleMatch[1]) {
+            title = decodeEntities(titleMatch[1].trim());
+        }
+    }
+
+    // 4. Determine final title
+    if (!title) {
+        // ... h1 fallback ...
+        const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+        if (h1Match && h1Match[1]) {
+            const clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
+            if (clean) title = decodeEntities(clean);
+        }
+    }
+
+    // Cleanup for Xiaohongshu specifically (remove suffix)
+    if (title && (html.includes('xiaohongshu.com') || html.includes('Red - The Little Red Book'))) {
+        title = title.replace(/\s*-\s*小红书$/, '');
+    }
+
+    return title;
 }
 
 /**
@@ -418,24 +443,59 @@ export default {
         }
 
         // ==========================================
+        // 1.5 Xiaohongshu 专用处理逻辑
+        // ==========================================
+        if (targetUrl.includes('xiaohongshu.com') || targetUrl.includes('xhslink.com')) {
+            const result = await getXiaohongshuInfo(targetUrl, env);
+
+            if (result && !('error' in result)) {
+                // Remove suffix just in case the parser didn't catch it (though it does)
+                let cleanTitle = result.title.replace(/\s*-\s*小红书$/, '');
+
+                // Format: "Author: Title"
+                const titleStr = result.author ? `${result.author}: "${cleanTitle}"` : cleanTitle;
+
+                return new Response(JSON.stringify({ title: titleStr }), {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "public, max-age=3600"
+                    },
+                });
+            }
+        }
+
+        // ==========================================
         // 2. 通用网页抓取逻辑 (Fallback & Default)
         // ==========================================
         for (const ua of USER_AGENTS) {
             try {
+                // Special handling for xhslink (needs mobile UA to redirect properly sometimes, or just follow redirects)
+                const isXhsLink = targetUrl.includes('xhslink.com');
+                const fetchHeaders = {
+                    "User-Agent": isXhsLink
+                        ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+                        : ua,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+                    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                };
+
                 const response = await fetch(targetUrl, {
-                    headers: {
-                        "User-Agent": ua,
-                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-                        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                    },
+                    headers: fetchHeaders,
                     redirect: "follow",
                     cf: { cacheTtl: 3600, cacheEverything: true },
                 } as any);
 
                 if (!response.ok) continue;
 
+                // If it's a short link, the response.url might be the final URL
+                const finalUrl = response.url;
                 const html = await response.text();
+
+                // Pass finalUrl to extractTitle if needed for logic dependent on URL
                 const title = extractTitle(html);
+
+
 
                 if (title && !title.includes("该页面不存在") && !title.includes("访问受限")) {
                     return new Response(JSON.stringify({ title }), {
