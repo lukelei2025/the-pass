@@ -34,7 +34,7 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       copied = await copyToClipboard(generateNotionFormat(item.content, safeCategory, item.source));
     }
     await updateItem(item.id, { status: action, processedAt: Date.now() });
-    if (copied) alert('Copied to clipboard');
+    if (copied) alert(t.item.copied);
   };
 
   return (
@@ -103,7 +103,7 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       {item.type === 'link' && item.originalUrl && (
         <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--color-ink-secondary)] w-fit max-w-full">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
-          <span className="truncate opacity-60">Link metadata identified</span>
+          <span className="truncate opacity-60">{t.item.linkMetadata}</span>
         </div>
       )}
 

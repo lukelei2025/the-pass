@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { CATEGORY_INFO, getRemainingTime, formatRemainingTime, mapCategory } from '../lib/constants';
+import { getRemainingTime, formatRemainingTime, mapCategory } from '../lib/constants';
 import { classifyContent } from '../lib/llm';
 import type { Category, ContentType } from '../types';
 import ItemCard from '../components/ItemCard';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function WorkbenchView() {
   const { items, addItem, settings } = useStore();
   const [inputText, setInputText] = useState('');
   const [isClassifying, setIsClassifying] = useState(false);
+  const { t } = useTranslation();
 
   const pendingItems = items.filter(item => item.status === 'pending');
   // Group items by NEW category keys, mapping old ones on the fly
@@ -99,7 +101,7 @@ export default function WorkbenchView() {
         <textarea
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Capture an idea or paste a link..."
+          placeholder={t.workbench.inputPlaceholder}
           className="macos-input w-full p-3 resize-none min-h-[50px] md:min-h-[80px]"
           rows={1}
           disabled={isClassifying}
@@ -113,10 +115,10 @@ export default function WorkbenchView() {
         <div className="flex justify-between items-center px-1">
           <div className={`flex items-center gap-1.5 text-[11px] font-medium transition-colors ${llmConfigured ? 'text-[var(--color-green)]' : 'text-[var(--color-ink-tertiary)]'}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${llmConfigured ? 'bg-[var(--color-green)]' : 'bg-[var(--color-ink-tertiary)]'}`} />
-            {isClassifying ? 'Classifying...' : (llmConfigured ? 'Auto-Classify On' : 'Auto-Classify Off')}
+            {isClassifying ? t.workbench.classifying : (llmConfigured ? t.workbench.autoClassifyOn : t.workbench.autoClassifyOff)}
           </div>
           <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)]">
-            {pendingCount} Pending
+            {pendingCount} {t.workbench.pending}
           </span>
         </div>
       </div>
@@ -124,11 +126,10 @@ export default function WorkbenchView() {
       {/* Grid Layouts by Category */}
       {Object.entries(itemsByCategory).map(([category, categoryItems]) => {
         if (categoryItems.length === 0) return null;
-        const catInfo = CATEGORY_INFO[category as Category];
         return (
           <div key={category} className="space-y-3">
             <h3 className="text-[11px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wider pl-1">
-              {catInfo.name}
+              {t.categories[category as Category]}
             </h3>
             <div className="content-grid">
               {categoryItems.map((item) => {
@@ -153,7 +154,7 @@ export default function WorkbenchView() {
           <div className="w-16 h-16 bg-[rgba(0,0,0,0.03)] rounded-2xl flex items-center justify-center mb-4 text-[var(--color-ink-tertiary)]">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 13l4 4L19 7" /></svg>
           </div>
-          <p className="text-[15px] font-medium text-[var(--color-ink-secondary)]">All Clear</p>
+          <p className="text-[15px] font-medium text-[var(--color-ink-secondary)]">{t.workbench.allClear}</p>
         </div>
       )}
 

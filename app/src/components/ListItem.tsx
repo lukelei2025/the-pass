@@ -35,12 +35,12 @@ export default function ListItem({ item }: ListItemProps) {
             : item.content;
 
         await copyToClipboard(generateNotionFormat(contentToCopy, safeCategory, item.source));
-        alert('Copied Notion format');
+        alert(t.item.copiedNotion);
     };
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm('Are you sure you want to delete this item?')) {
+        if (confirm(t.item.deleteConfirm)) {
             updateItem(item.id, { status: 'composted', processedAt: Date.now() });
         }
     };
@@ -171,7 +171,7 @@ export default function ListItem({ item }: ListItemProps) {
                                 ref={textareaRef}
                                 value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
-                                placeholder="Add a note..."
+                                placeholder={t.item.addNote}
                                 className="w-full bg-[var(--color-bg-app)] border border-[var(--color-border)] rounded-md p-3 text-[14px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none"
                                 rows={3}
                             />
@@ -180,13 +180,13 @@ export default function ListItem({ item }: ListItemProps) {
                                     onClick={() => setIsEditing(false)}
                                     className="px-3 py-1.5 text-[12px] font-medium text-[var(--color-ink-secondary)] hover:bg-[rgba(0,0,0,0.05)] rounded"
                                 >
-                                    Cancel
+                                    {t.common.cancel}
                                 </button>
                                 <button
                                     onClick={handleSave}
                                     className="px-3 py-1.5 text-[12px] font-medium text-white bg-[var(--color-accent)] hover:bg-[#0077ED] rounded"
                                 >
-                                    Save
+                                    {t.common.save}
                                 </button>
                             </div>
                         </div>
@@ -200,8 +200,8 @@ export default function ListItem({ item }: ListItemProps) {
                                 title="Click to edit note"
                             >
                                 {(hasSeparateTitle || item.content !== displayTitle)
-                                    ? (item.content || 'No note. Click to add...')
-                                    : <span className="text-[var(--color-ink-tertiary)] italic">No note. Click to add...</span>
+                                    ? (item.content || t.item.noNote)
+                                    : <span className="text-[var(--color-ink-tertiary)] italic">{t.item.noNote}</span>
                                 }
                             </div>
 
@@ -211,21 +211,21 @@ export default function ListItem({ item }: ListItemProps) {
                                     className="flex items-center gap-1.5 text-[12px] text-[var(--color-ink-secondary)] hover:text-[var(--color-ink)] transition-colors"
                                 >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-                                    Copy Notion
+                                    {t.item.copyNotion}
                                 </button>
                                 <button
                                     onClick={() => setIsEditing(true)}
                                     className="flex items-center gap-1.5 text-[12px] text-[var(--color-ink-secondary)] hover:text-[var(--color-ink)] transition-colors"
                                 >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                    Edit Note
+                                    {t.item.editNote}
                                 </button>
                                 <button
                                     onClick={handleDelete}
                                     className="flex items-center gap-1.5 text-[12px] text-[var(--color-ink-secondary)] hover:text-[var(--color-red)] transition-colors ml-auto"
                                 >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                                    Delete
+                                    {t.common.delete}
                                 </button>
                             </div>
                         </div>

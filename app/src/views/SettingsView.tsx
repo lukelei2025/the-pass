@@ -31,7 +31,7 @@ export default function SettingsView() {
                     onClick={() => setCurrentView('workbench')}
                     className="md:hidden text-[var(--color-accent)] text-[15px] font-medium"
                 >
-                    &larr; Back
+                    &larr; {t.settings.back}
                 </button>
                 <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.settings.title}</h2>
             </div>
@@ -42,7 +42,7 @@ export default function SettingsView() {
                     <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">{t.settings.language}</h3>
                     <div className="bg-white border border-[var(--color-border)] rounded-[10px] overflow-hidden shadow-sm">
                         <div className="flex items-center justify-between p-4 hover:bg-[var(--color-surface-hover)] transition-colors">
-                            <span className="text-[14px] font-medium text-[var(--color-ink)]">App Language / 应用语言</span>
+                            <span className="text-[14px] font-medium text-[var(--color-ink)]">{t.settings.appLanguage}</span>
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value as 'en' | 'zh')}
@@ -61,8 +61,8 @@ export default function SettingsView() {
                     <div className="bg-white border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="text-[14px] font-medium text-[var(--color-ink)]">Auto-Classification</div>
-                                <div className="text-[12px] text-[var(--color-ink-secondary)]">Intelligently categorize new items</div>
+                                <div className="text-[14px] font-medium text-[var(--color-ink)]">{t.settings.autoClassify}</div>
+                                <div className="text-[12px] text-[var(--color-ink-secondary)]">{t.settings.autoClassifyDesc}</div>
                             </div>
                             <button
                                 onClick={() => updateSettings({ llmAutoClassify: !settings.llmAutoClassify })}
@@ -73,7 +73,7 @@ export default function SettingsView() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[13px] font-medium text-[var(--color-ink)]">GLM-4 API Key</label>
+                            <label className="text-[13px] font-medium text-[var(--color-ink)]">{t.settings.apiKeyLabel}</label>
                             <input
                                 type="password"
                                 value={apiKey}
@@ -85,10 +85,10 @@ export default function SettingsView() {
 
                         <div className="flex justify-end gap-3 pt-2">
                             <button onClick={handleTestApi} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                {isTesting ? t.common.loading : 'Test Connection'}
+                                {isTesting ? t.common.loading : t.settings.testConnection}
                             </button>
                             <button onClick={handleSave} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                {t.common.save} Key
+                                {t.settings.saveKey}
                             </button>
                         </div>
 
@@ -102,25 +102,25 @@ export default function SettingsView() {
 
                 {/* Section: Expiry */}
                 <section>
-                    <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">Data Expiry</h3>
+                    <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">{t.settings.dataExpiry}</h3>
                     <div className="bg-white border border-[var(--color-border)] rounded-[10px] overflow-hidden shadow-sm">
                         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
-                            <span className="text-[14px] font-medium text-[var(--color-ink)]">Expire After</span>
+                            <span className="text-[14px] font-medium text-[var(--color-ink)]">{t.settings.expireAfter}</span>
                             <select
                                 value={settings.expireHours}
                                 onChange={(e) => updateSettings({ expireHours: Number(e.target.value) as 24 | 48 })}
                                 className="bg-transparent text-[14px] text-[var(--color-ink-secondary)] outline-none cursor-pointer"
                             >
-                                <option value={24}>24 Hours</option>
-                                <option value={48}>48 Hours</option>
+                                <option value={24}>{t.settings.hours24}</option>
+                                <option value={48}>{t.settings.hours48}</option>
                             </select>
                         </div>
 
                         <div className="p-4 hover:bg-[var(--color-surface-hover)] transition-colors">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
-                                    <div className="text-[14px] font-medium text-[var(--color-ink)]">Daily Clearance</div>
-                                    <div className="text-[12px] text-[var(--color-ink-secondary)]">Archive all pending items at a set time</div>
+                                    <div className="text-[14px] font-medium text-[var(--color-ink)]">{t.settings.dailyClearance}</div>
+                                    <div className="text-[12px] text-[var(--color-ink-secondary)]">{t.settings.dailyClearanceDesc}</div>
                                 </div>
                                 <button
                                     onClick={() => updateSettings({ clearanceEnabled: !settings.clearanceEnabled })}
@@ -132,7 +132,7 @@ export default function SettingsView() {
 
                             {settings.clearanceEnabled && (
                                 <div className="flex items-center justify-between pt-3 border-t border-[var(--color-border)]">
-                                    <span className="text-[13px] text-[var(--color-ink-secondary)]">Clearance Time</span>
+                                    <span className="text-[13px] text-[var(--color-ink-secondary)]">{t.settings.clearanceTime}</span>
                                     <input
                                         type="time"
                                         value={settings.clearanceTime}
