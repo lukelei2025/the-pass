@@ -438,7 +438,7 @@ export default {
                 }
 
                 // 格式化为 App 期望的字符串格式: Author: "Title"
-                const titleStr = `${tweetInfo.author}: "${tweetInfo.title}"`;
+                const titleStr = `"${tweetInfo.title}" #${tweetInfo.author}`;
                 return new Response(JSON.stringify({ title: titleStr }), {
                     headers: {
                         "Content-Type": "application/json",
