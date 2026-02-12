@@ -56,6 +56,43 @@ function decodeEntities(text: string): string {
         .replace(/&nbsp;/g, ' ');
 }
 
+// ... (imports) ...
+
+async function fetchTwitterOEmbed(url: string): Promise<string | null> {
+    try {
+        const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
+        // Local Node fetch 
+        const response = await fetch(oembedUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' }
+        });
+        if (!response.ok) return null;
+        const data = await response.json() as any;
+
+        // Same extraction logic
+        const authorName = data.author_name;
+        const html = data.html || '';
+        let content = html.replace(/<[^>]+>/g, ' ').trim();
+
+        // Clean signature
+        content = content.replace(/(&mdash;|—).+$/s, '').trim();
+
+        // Decode entities
+        content = content
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ');
+
+        if (authorName && content) {
+            const shortContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+            return `${authorName}: "${shortContent}"`;
+        }
+        return data.title || null;
+    } catch { return null; }
+}
+
 export function fetchTitlePlugin(): Plugin {
     return {
         name: 'fetch-title-proxy',
@@ -71,6 +108,15 @@ export function fetchTitlePlugin(): Plugin {
                     res.statusCode = 400;
                     res.end(JSON.stringify({ error: 'Missing url parameter' }));
                     return;
+                }
+
+                // 优先尝试 Twitter/X oEmbed
+                if (targetUrl.includes('x.com/') || targetUrl.includes('twitter.com/')) {
+                    const twitterTitle = await fetchTwitterOEmbed(targetUrl);
+                    if (twitterTitle) {
+                        res.end(JSON.stringify({ title: twitterTitle }));
+                        return;
+                    }
                 }
 
                 // 依次尝试每种 User-Agent

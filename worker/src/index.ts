@@ -56,9 +56,18 @@ function extractTitle(html: string | null) {
 async function fetchTwitterOEmbed(url: string): Promise<string | null> {
     try {
         const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
-        const response = await fetch(oembedUrl);
+        console.log(`Fetching Twitter oEmbed for: ${url}`);
+        const response = await fetch(oembedUrl, {
+            headers: {
+                // 必须添加 UA，否则 Twitter 可能拒绝请求
+                'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+            }
+        });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            console.warn(`Twitter oEmbed failed for ${url}: ${response.status} ${response.statusText}`);
+            return null;
+        }
 
         const data = await response.json() as any;
         const authorName = data.author_name;
@@ -68,18 +77,31 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
         // 格式通常为: <p ...>Content</p>&mdash; Author (@handle) ...
         let content = html.replace(/<[^>]+>/g, ' ').trim();
 
-        // 简单的清理，移除末尾的日期
-        content = content.replace(/\s\([^\)]+\)$/, '');
+        // 清理末尾的作者签名和日期 (从 &mdash; 或 — 开始截断)
+        content = content.replace(/(&mdash;|—).+$/s, '').trim();
+
+        // Decode HTML entities in content (e.g. &amp;)
+        content = content
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ');
 
         if (authorName && content) {
             // 如果内容太长，截断
-            const shortContent = content.length > 50 ? content.substring(0, 50) + '...' : content;
+            const shortContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+            console.log(`Twitter oEmbed success for ${url}: ${authorName}: "${shortContent}"`);
             return `${authorName}: "${shortContent}"`;
         }
 
-        return data.title || (authorName ? `Tweet by ${authorName}` : null);
+        const title = data.title || (authorName ? `Tweet by ${authorName}` : null);
+        console.log(`Twitter oEmbed success for ${url}, using title: ${title}`);
+        return title;
     } catch (e) {
-        return null;
+        console.error(`Twitter oEmbed error for ${url}:`, e);
+        return null; // fallback to generic scraping
     }
 }
 
