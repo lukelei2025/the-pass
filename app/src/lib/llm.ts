@@ -97,7 +97,8 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
     }
 
     // 策略 1: 本地 Vite 开发服务器代理 (仅 Dev 环境可用)
-    if (import.meta.env.DEV) {
+    // 注意: Twitter/X 需要 oEmbed 支持，本地代理可能不稳定，建议 Twitter 链接直接走 Worker
+    if (import.meta.env.DEV && !url.includes('twitter.com') && !url.includes('x.com')) {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
