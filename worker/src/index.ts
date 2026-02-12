@@ -309,10 +309,10 @@ async function handleClassify(request: Request, env: Env): Promise<Response> {
         const prompt = `
 ${CLASSIFICATION_RULES}
 
-用户原始输入: """${content}"""
-${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl}, 标题 "${metadata.title || ''}")` : ''}
+用户原始输入: """${content.replace(/"/g, '\\"')}"""
+${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl}, 标题 "${(metadata.title || '').replace(/"/g, '\\"')}")` : ''}
 
-请严格遵守 JSON 格式返回，不要包含 Markdown 标记：
+请严格遵守 JSON 格式返回，确保所有字符串内的双引号都经过转义（\"），不要包含 Markdown 标记：
 {
   "reasoning": "你的思考过程...",
   "category": "category_key"
@@ -343,6 +343,13 @@ ${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl},
 
         const data = await response.json() as any;
         let rawContent = data.choices?.[0]?.message?.content?.trim();
+
+        // Try to extract JSON from the response if it contains other text
+        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            rawContent = jsonMatch[0];
+        }
+
         rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
         let result;
