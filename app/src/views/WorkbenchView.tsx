@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { CATEGORY_INFO, getRemainingTime, formatRemainingTime } from '../lib/constants';
+import { CATEGORY_INFO, getRemainingTime, formatRemainingTime, mapCategory } from '../lib/constants';
 import { classifyContent } from '../lib/llm';
 import type { Category, ContentType } from '../types';
 import ItemCard from '../components/ItemCard';
@@ -11,10 +11,14 @@ export default function WorkbenchView() {
   const [isClassifying, setIsClassifying] = useState(false);
 
   const pendingItems = items.filter(item => item.status === 'pending');
+  // Group items by NEW category keys, mapping old ones on the fly
   const itemsByCategory: Record<Category, typeof pendingItems> = {
-    inspiration: [], work: [], personal: [], article: [], other: [],
+    ideas: [], work: [], personal: [], external: [], others: [],
   };
-  pendingItems.forEach(item => { itemsByCategory[item.category].push(item); });
+  pendingItems.forEach(item => {
+    const safeCat = mapCategory(item.category);
+    itemsByCategory[safeCat].push(item);
+  });
 
   const handleAddItem = async () => {
     if (!inputText.trim()) return;

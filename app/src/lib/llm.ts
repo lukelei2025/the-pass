@@ -26,24 +26,24 @@ export interface ContentMetadata {
  * 已知平台识别
  */
 const PLATFORM_PATTERNS: Record<string, { name: string; category: Category }> = {
-    'mp.weixin.qq.com': { name: '微信公众号', category: 'article' },
-    'weixin.qq.com': { name: '微信', category: 'article' },
-    'xiaohongshu.com': { name: '小红书', category: 'article' },
-    'xhslink.com': { name: '小红书', category: 'article' },
-    'zhihu.com': { name: '知乎', category: 'article' },
-    'zhuanlan.zhihu.com': { name: '知乎专栏', category: 'article' },
-    'bilibili.com': { name: 'B站', category: 'article' },
-    'b23.tv': { name: 'B站', category: 'article' },
-    'douyin.com': { name: '抖音', category: 'article' },
-    'v.douyin.com': { name: '抖音', category: 'article' },
-    'youtube.com': { name: 'YouTube', category: 'article' },
-    'youtu.be': { name: 'YouTube', category: 'article' },
-    'twitter.com': { name: 'Twitter/X', category: 'article' },
-    'x.com': { name: 'Twitter/X', category: 'article' },
-    'github.com': { name: 'GitHub', category: 'article' },
-    'notion.so': { name: 'Notion', category: 'article' },
-    'feishu.cn': { name: '飞书', category: 'article' },
-    'dingtalk.com': { name: '钉钉', category: 'article' },
+    'mp.weixin.qq.com': { name: '微信公众号', category: 'external' },
+    'weixin.qq.com': { name: '微信', category: 'external' },
+    'xiaohongshu.com': { name: '小红书', category: 'external' },
+    'xhslink.com': { name: '小红书', category: 'external' },
+    'zhihu.com': { name: '知乎', category: 'external' },
+    'zhuanlan.zhihu.com': { name: '知乎专栏', category: 'external' },
+    'bilibili.com': { name: 'B站', category: 'external' },
+    'b23.tv': { name: 'B站', category: 'external' },
+    'douyin.com': { name: '抖音', category: 'external' },
+    'v.douyin.com': { name: '抖音', category: 'external' },
+    'youtube.com': { name: 'YouTube', category: 'external' },
+    'youtu.be': { name: 'YouTube', category: 'external' },
+    'twitter.com': { name: 'Twitter/X', category: 'external' },
+    'x.com': { name: 'Twitter/X', category: 'external' },
+    'github.com': { name: 'GitHub', category: 'external' },
+    'notion.so': { name: 'Notion', category: 'external' },
+    'feishu.cn': { name: '飞书', category: 'external' },
+    'dingtalk.com': { name: '钉钉', category: 'external' },
     'taobao.com': { name: '淘宝', category: 'personal' },
     'jd.com': { name: '京东', category: 'personal' },
     'tmall.com': { name: '天猫', category: 'personal' },
@@ -97,7 +97,7 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
                     console.log(`[WeChat Worker] 获取到标题: ${data.title}`);
                     // 优先使用公众号名称 (account)，其次是作者 (author)
                     const authorName = data.author?.account || data.author?.author || data.account;
-                    return authorName ? `${data.title} - ${authorName}` : data.title;
+                    return authorName ? `${data.title} #${authorName}` : data.title;
                 }
             }
         } catch (err) {
@@ -265,7 +265,7 @@ export async function classifyContent(
                 return { category: platformInfo.category, metadata };
             }
         }
-        return { category: isLink ? 'article' : 'other', metadata };
+        return { category: isLink ? 'external' : 'others', metadata };
     }
 
     // 4. 调用 LLM 进行分类 (传入完整原始 content)
@@ -293,7 +293,7 @@ export async function classifyContent(
 
         if (!response.ok) {
             console.error('GLM API 请求失败:', response.status, response.statusText);
-            return { category: isLink ? 'article' : 'other', metadata };
+            return { category: isLink ? 'external' : 'others', metadata };
         }
 
         const data = await response.json();
@@ -304,7 +304,7 @@ export async function classifyContent(
 
         console.log('[LLM Raw Output]:', rawContent);
 
-        let resultCategory: Category = 'other';
+        let resultCategory: Category = 'others';
         try {
             const parsed = JSON.parse(rawContent);
             resultCategory = parsed.category?.toLowerCase();
@@ -312,22 +312,41 @@ export async function classifyContent(
         } catch (e) {
             // 兜底：如果 JSON 解析失败，尝试直接匹配单词
             console.warn('JSON 解析失败，尝试降级匹配', e);
-            const validCategories: Category[] = ['inspiration', 'work', 'personal', 'article', 'other'];
+            const validCategories: Category[] = ['ideas', 'work', 'personal', 'external', 'others'];
+            // 兼容旧的 fallback 逻辑，但映射到新的 key
+            const mapOld: Record<string, Category> = {
+                'inspiration': 'ideas',
+                'article': 'external',
+                'other': 'others'
+            };
+
             if (validCategories.includes(rawContent as Category)) {
                 resultCategory = rawContent as Category;
+            } else if (mapOld[rawContent]) {
+                resultCategory = mapOld[rawContent];
             }
         }
 
         // 验证返回的分类是否有效
-        const validCategories: Category[] = ['inspiration', 'work', 'personal', 'article', 'other'];
+        const validCategories: Category[] = ['ideas', 'work', 'personal', 'external', 'others'];
         if (validCategories.includes(resultCategory)) {
             return { category: resultCategory, metadata };
         }
 
-        return { category: isLink ? 'article' : 'other', metadata };
+        // 尝试映射旧 key (如果 LLM 偶尔输出旧的)
+        const mapOld: Record<string, Category> = {
+            'inspiration': 'ideas',
+            'article': 'external',
+            'other': 'others'
+        };
+        if (mapOld[resultCategory]) {
+            return { category: mapOld[resultCategory], metadata };
+        }
+
+        return { category: isLink ? 'external' : 'others', metadata };
     } catch (error) {
         console.error('LLM 分类失败:', error);
-        return { category: isLink ? 'article' : 'other', metadata };
+        return { category: isLink ? 'external' : 'others', metadata };
     }
 }
 

@@ -1,4 +1,5 @@
 import type { Item } from '../types';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ActionDrawerProps {
     item: Item;
@@ -8,6 +9,7 @@ interface ActionDrawerProps {
 }
 
 export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawerProps) {
+    const { t } = useTranslation();
     if (!isOpen) return null;
 
     return (
@@ -30,7 +32,7 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
                         <div className="w-12 h-12 rounded-full bg-[var(--bg-tag-green)] flex items-center justify-center text-[var(--color-green)]">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
                         </div>
-                        <span className="text-[12px] font-semibold">Fini</span>
+                        <span className="text-[12px] font-semibold">{t.actions.clear}</span>
                     </button>
 
                     <button
@@ -40,7 +42,7 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
                         <div className="w-12 h-12 rounded-full bg-[var(--bg-tag-blue)] flex items-center justify-center text-[var(--color-blue)]">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
                         </div>
-                        <span className="text-[12px] font-semibold">Tick</span>
+                        <span className="text-[12px] font-semibold">{t.actions.todo}</span>
                     </button>
 
                     <button
@@ -50,7 +52,7 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
                         <div className="w-12 h-12 rounded-full bg-[var(--bg-tag-purple)] flex items-center justify-center text-[var(--color-purple)]">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
                         </div>
-                        <span className="text-[12px] font-semibold">Stow</span>
+                        <span className="text-[12px] font-semibold">{t.actions.stash}</span>
                     </button>
 
                     <button
@@ -60,7 +62,7 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
                         <div className="w-12 h-12 rounded-full bg-[var(--bg-tag-gray)] flex items-center justify-center text-[var(--color-red)]">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                         </div>
-                        <span className="text-[12px] font-semibold text-[var(--color-red)]">Void</span>
+                        <span className="text-[12px] font-semibold text-[var(--color-red)]">{t.actions.void}</span>
                     </button>
                 </div>
             </div>

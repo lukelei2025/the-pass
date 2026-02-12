@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { CATEGORY_INFO } from '../lib/constants';
+import { mapCategory } from '../lib/constants';
 import type { Category } from '../types';
 import ListItem from '../components/ListItem';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function FreezerView() {
   const { items } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<Category>>(new Set());
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const { t } = useTranslation();
 
   // 1. 获取所有 frozen 项目，按创建时间倒序
   const frozenItems = useMemo(() =>
@@ -32,7 +34,7 @@ export default function FreezerView() {
   // 3. 动态提取所有出现过的分类
   const availableCategories = useMemo(() => {
     const cats = new Set<Category>();
-    frozenItems.forEach(item => cats.add(item.category));
+    frozenItems.forEach(item => cats.add(mapCategory(item.category)));
     return Array.from(cats);
   }, [frozenItems]);
 
@@ -47,7 +49,7 @@ export default function FreezerView() {
         if (!matchContent && !matchSource) return false;
       }
       // 分类筛选
-      if (selectedCategories.size > 0 && !selectedCategories.has(item.category)) {
+      if (selectedCategories.size > 0 && !selectedCategories.has(mapCategory(item.category))) {
         return false;
       }
       // 平台标签筛选
@@ -84,11 +86,11 @@ export default function FreezerView() {
       return 'bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)] hover:bg-[rgba(0,0,0,0.08)]';
     }
     const styles: Record<Category, string> = {
-      inspiration: 'bg-[var(--bg-tag-orange)] text-[var(--color-orange)] ring-1 ring-[var(--color-orange)]/30',
+      ideas: 'bg-[var(--bg-tag-orange)] text-[var(--color-orange)] ring-1 ring-[var(--color-orange)]/30',
       work: 'bg-[var(--bg-tag-blue)] text-[var(--color-blue)] ring-1 ring-[var(--color-blue)]/30',
       personal: 'bg-[var(--bg-tag-green)] text-[var(--color-green)] ring-1 ring-[var(--color-green)]/30',
-      article: 'bg-[var(--bg-tag-purple)] text-[var(--color-purple)] ring-1 ring-[var(--color-purple)]/30',
-      other: 'bg-[var(--bg-tag-gray)] text-[var(--color-gray)] ring-1 ring-[var(--color-gray)]/30',
+      external: 'bg-[var(--bg-tag-purple)] text-[var(--color-purple)] ring-1 ring-[var(--color-purple)]/30',
+      others: 'bg-[var(--bg-tag-gray)] text-[var(--color-gray)] ring-1 ring-[var(--color-gray)]/30',
     };
     return styles[cat];
   };
@@ -97,7 +99,7 @@ export default function FreezerView() {
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
-        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">La Réserve</h2>
+        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.freezer.title}</h2>
         <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
           {filteredItems.length}{hasActiveFilters ? ` / ${frozenItems.length}` : ''} items
         </span>
@@ -143,7 +145,7 @@ export default function FreezerView() {
                   onClick={() => toggleCategory(cat)}
                   className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-all duration-150 cursor-pointer ${categoryPillStyle(cat, selectedCategories.has(cat))}`}
                 >
-                  {CATEGORY_INFO[cat].name}
+                  {t.categories[cat]}
                 </button>
               ))}
             </div>
@@ -198,7 +200,7 @@ export default function FreezerView() {
             </svg>
           </div>
           <p className="text-[15px] font-medium text-[var(--color-ink-secondary)]">
-            {hasActiveFilters ? 'No matching items' : 'Réserve empty'}
+            {hasActiveFilters ? 'No matching items' : t.freezer.empty}
           </p>
           {hasActiveFilters && (
             <button

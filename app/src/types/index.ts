@@ -7,11 +7,11 @@ export type ContentType = 'text' | 'link' | 'note';
  * 内容分类
  */
 export type Category =
-  | 'inspiration'  // 💡 随时灵感
-  | 'work'         // 💼 工作待办
-  | 'personal'     // 🏠 个人生活
-  | 'article'      // 📰 文章链接
-  | 'other';       // 📝 其他
+  | 'ideas'      // 💡 Ideas (was Inspiration)
+  | 'work'       // 💼 Work
+  | 'personal'   // 🏠 Personal
+  | 'external'   // 🔗 External (was Article)
+  | 'others';    // 📝 Others (was Other)
 
 /**
  * 卡片状态

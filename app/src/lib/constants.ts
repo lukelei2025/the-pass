@@ -3,35 +3,56 @@ import type { Category, CategoryInfo, Urgency } from '../types';
 /**
  * 分类信息映射
  */
+/**
+ * 兼容旧数据的分类映射
+ */
+export function mapCategory(cat: string): Category {
+  const map: Record<string, Category> = {
+    'inspiration': 'ideas',
+    'idea': 'ideas',
+    'ideas': 'ideas',
+    'work': 'work',
+    'personal': 'personal',
+    'article': 'external',
+    'external': 'external',
+    'other': 'others',
+    'others': 'others',
+  };
+  return map[cat.toLowerCase()] || 'others';
+}
+
+/**
+ * 分类信息映射
+ */
 export const CATEGORY_INFO: Record<Category, CategoryInfo> = {
-  inspiration: {
-    id: 'inspiration',
-    name: '灵感',
-    icon: '',
-    color: 'cat-dot-inspiration',
+  ideas: {
+    id: 'ideas',
+    name: 'Ideas',
+    icon: '💡',
+    color: 'cat-dot-inspiration', // Reuse existing color class or rename in CSS? Assuming class exists
   },
   work: {
     id: 'work',
-    name: '工作',
-    icon: '',
+    name: 'Work',
+    icon: '💼',
     color: 'cat-dot-work',
   },
   personal: {
     id: 'personal',
-    name: '个人',
-    icon: '',
+    name: 'Personal',
+    icon: '🏠',
     color: 'cat-dot-personal',
   },
-  article: {
-    id: 'article',
-    name: '待看链接',
-    icon: '',
+  external: {
+    id: 'external',
+    name: 'External',
+    icon: '🔗', // or 📰
     color: 'cat-dot-article',
   },
-  other: {
-    id: 'other',
-    name: '其他',
-    icon: '',
+  others: {
+    id: 'others',
+    name: 'Others',
+    icon: '📝',
     color: 'cat-dot-other',
   },
 };
@@ -67,10 +88,10 @@ export function getRemainingTime(expiresAt: number): {
  * 格式化剩余时间
  */
 export function formatRemainingTime(hours: number, minutes: number): string {
-  if (hours === 0 && minutes === 0) return '已过期';
-  if (hours === 0) return `还剩 ${minutes} 分钟`;
-  if (hours < 24) return `还剩 ${hours} 小时 ${minutes} 分`;
-  return `还剩 ${hours} 小时`;
+  if (hours === 0 && minutes === 0) return 'Expired';
+  if (hours === 0) return `${minutes}m left`;
+  if (hours < 24) return `${hours}h ${minutes}m left`;
+  return `${hours}h left`;
 }
 
 /**
@@ -83,13 +104,13 @@ export function formatDateTime(timestamp: number): string {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
   if (days === 0) {
-    return `今天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+    return `Today ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   } else if (days === 1) {
-    return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+    return `Yesterday ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   } else if (days < 7) {
-    return `${days}天前`;
+    return `${days}d ago`;
   } else {
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 }
 
@@ -98,11 +119,11 @@ export function formatDateTime(timestamp: number): string {
  */
 export function generateTodoistFormat(content: string, category: Category): string {
   const categoryTag = {
-    inspiration: '@灵感',
-    work: '@工作',
-    personal: '@个人',
-    article: '@待看',
-    other: '@其他',
+    ideas: '@Ideas',
+    work: '@Work',
+    personal: '@Personal',
+    external: '@External',
+    others: '@Others',
   }[category];
 
   return `[- ] ${content}\n${categoryTag}`;
@@ -113,17 +134,17 @@ export function generateTodoistFormat(content: string, category: Category): stri
  */
 export function generateNotionFormat(content: string, category: Category, source?: string): string {
   const tags = {
-    inspiration: '#灵感',
-    work: '#工作',
-    personal: '#个人',
-    article: '#待看',
-    other: '#其他',
+    ideas: '#Ideas',
+    work: '#Work',
+    personal: '#Personal',
+    external: '#External',
+    others: '#Others',
   }[category];
 
-  let result = `# ${content}\n标签: ${tags}\n`;
+  let result = `# ${content}\nTags: ${tags}\n`;
 
   if (source) {
-    result += `来源: ${source}\n`;
+    result += `Source: ${source}\n`;
   }
 
   result += `---`;

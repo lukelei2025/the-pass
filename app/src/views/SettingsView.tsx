@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { testApiConnection } from '../lib/llm';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function SettingsView() {
     const { settings, updateSettings, setCurrentView } = useStore();
     const [apiKey, setApiKey] = useState(localStorage.getItem('llmApiKey') || '');
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTesting, setIsTesting] = useState(false);
+    const { t, language, setLanguage } = useTranslation();
 
     const handleSave = async () => {
         localStorage.setItem('llmApiKey', apiKey);
-        alert('Settings Saved');
+        alert(t.common.save + ' Success');
     };
 
     const handleTestApi = async () => {
@@ -31,13 +33,31 @@ export default function SettingsView() {
                 >
                     &larr; Back
                 </button>
-                <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">Settings</h2>
+                <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.settings.title}</h2>
             </div>
 
             <div className="space-y-6">
+                {/* Section: Language */}
+                <section>
+                    <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">{t.settings.language}</h3>
+                    <div className="bg-white border border-[var(--color-border)] rounded-[10px] overflow-hidden shadow-sm">
+                        <div className="flex items-center justify-between p-4 hover:bg-[var(--color-surface-hover)] transition-colors">
+                            <span className="text-[14px] font-medium text-[var(--color-ink)]">App Language / 应用语言</span>
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value as 'en' | 'zh')}
+                                className="bg-transparent text-[14px] text-[var(--color-ink-secondary)] outline-none cursor-pointer"
+                            >
+                                <option value="en">English</option>
+                                <option value="zh">中文 (Chinese)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Section: AI */}
                 <section>
-                    <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">AI Automation</h3>
+                    <h3 className="text-[13px] font-semibold text-[var(--color-ink-secondary)] uppercase tracking-wide mb-3">{t.settings.llm}</h3>
                     <div className="bg-white border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -65,10 +85,10 @@ export default function SettingsView() {
 
                         <div className="flex justify-end gap-3 pt-2">
                             <button onClick={handleTestApi} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                {isTesting ? 'Testing...' : 'Test Connection'}
+                                {isTesting ? t.common.loading : 'Test Connection'}
                             </button>
                             <button onClick={handleSave} className="text-[13px] font-medium text-[var(--color-accent)] hover:text-[#0077ED]">
-                                Save Key
+                                {t.common.save} Key
                             </button>
                         </div>
 

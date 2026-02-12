@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Item } from '../types';
-import { copyToClipboard, generateNotionFormat, CATEGORY_INFO } from '../lib/constants';
+import { copyToClipboard, generateNotionFormat, mapCategory } from '../lib/constants';
 import { useStore } from '../store/useStore';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ListItemProps {
     item: Item;
@@ -13,6 +14,8 @@ export default function ListItem({ item }: ListItemProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(item.content);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const safeCategory = mapCategory(item.category);
+    const { t } = useTranslation();
 
     // Extract source domain or name for display
     const sourceTag = item.source && !item.source.startsWith('http') ? item.source : null;
@@ -31,7 +34,7 @@ export default function ListItem({ item }: ListItemProps) {
             ? `${item.title}\n${item.content}`
             : item.content;
 
-        await copyToClipboard(generateNotionFormat(contentToCopy, item.category, item.source));
+        await copyToClipboard(generateNotionFormat(contentToCopy, safeCategory, item.source));
         alert('Copied Notion format');
     };
 
@@ -99,7 +102,6 @@ export default function ListItem({ item }: ListItemProps) {
         day: 'numeric',
     });
 
-    const catInfo = CATEGORY_INFO[item.category];
 
     return (
         <div className={`border-b border-[var(--color-border)] last:border-0 transition-all duration-200 ${isExpanded ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'}`}>
@@ -136,13 +138,13 @@ export default function ListItem({ item }: ListItemProps) {
                 {/* Tags */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide 
-            ${item.category === 'inspiration' ? 'text-[var(--color-orange)] bg-[var(--bg-tag-orange)]' :
-                            item.category === 'work' ? 'text-[var(--color-blue)] bg-[var(--bg-tag-blue)]' :
-                                item.category === 'personal' ? 'text-[var(--color-green)] bg-[var(--bg-tag-green)]' :
-                                    item.category === 'article' ? 'text-[var(--color-purple)] bg-[var(--bg-tag-purple)]' :
+            ${safeCategory === 'ideas' ? 'text-[var(--color-orange)] bg-[var(--bg-tag-orange)]' :
+                            safeCategory === 'work' ? 'text-[var(--color-blue)] bg-[var(--bg-tag-blue)]' :
+                                safeCategory === 'personal' ? 'text-[var(--color-green)] bg-[var(--bg-tag-green)]' :
+                                    safeCategory === 'external' ? 'text-[var(--color-purple)] bg-[var(--bg-tag-purple)]' :
                                         'text-[var(--color-gray)] bg-[var(--bg-tag-gray)]'
                         }`}>
-                        {catInfo.name}
+                        {t.categories[safeCategory]}
                     </span>
 
                     {sourceTag && (

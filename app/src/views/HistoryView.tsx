@@ -1,8 +1,10 @@
 import { useStore } from '../store/useStore';
-import { CATEGORY_INFO } from '../lib/constants';
+import { mapCategory } from '../lib/constants';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function HistoryView() {
   const { items } = useStore();
+  const { t } = useTranslation();
   const processedItems = items.filter(item =>
     ['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)
   ).sort((a, b) => (b.processedAt || b.createdAt) - (a.processedAt || a.createdAt));
@@ -10,13 +12,13 @@ export default function HistoryView() {
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
-        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">Le Journal</h2>
+        <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.history.title}</h2>
         <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{processedItems.length} records</span>
       </div>
 
       {processedItems.length === 0 ? (
         <div className="text-center py-24 text-[var(--color-ink-tertiary)] text-[14px]">
-          No history
+          {t.history.empty}
         </div>
       ) : (
         <div className="bg-white border border-[var(--color-border)] rounded-[10px] shadow-sm overflow-hidden">
@@ -32,12 +34,13 @@ export default function HistoryView() {
             <tbody>
               {processedItems.map((item) => {
                 const statusMap: Record<string, string> = {
-                  cooked: 'Fini',
-                  todo: 'Tick',
-                  frozen: 'Stow',
-                  composted: 'Void',
+                  cooked: t.actions.clear,
+                  todo: t.actions.todo,
+                  frozen: t.actions.stash,
+                  composted: t.actions.void,
                   expired: 'Expired',
                 };
+                const safeCategory = mapCategory(item.category);
                 return (
                   <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
                     <td className="px-4 py-3 font-medium text-[var(--color-ink-secondary)]">
@@ -45,7 +48,7 @@ export default function HistoryView() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
-                        {CATEGORY_INFO[item.category].name}
+                        {t.categories[safeCategory]}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-xs">{item.content}</td>
