@@ -65,8 +65,9 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
         });
 
         if (!response.ok) {
-            console.warn(`Twitter oEmbed failed for ${url}: ${response.status} ${response.statusText}`);
-            return null;
+            const errorMsg = `Twitter oEmbed failed: ${response.status} ${response.statusText}`;
+            console.warn(`[Debug] ${errorMsg}`);
+            return `[Debug Error] ${errorMsg}`;
         }
 
         const data = await response.json() as any;
@@ -90,18 +91,15 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
             .replace(/&nbsp;/g, ' ');
 
         if (authorName && content) {
-            // 如果内容太长，截断
             const shortContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
-            console.log(`Twitter oEmbed success for ${url}: ${authorName}: "${shortContent}"`);
             return `${authorName}: "${shortContent}"`;
         }
 
-        const title = data.title || (authorName ? `Tweet by ${authorName}` : null);
-        console.log(`Twitter oEmbed success for ${url}, using title: ${title}`);
-        return title;
-    } catch (e) {
-        console.error(`Twitter oEmbed error for ${url}:`, e);
-        return null; // fallback to generic scraping
+        return data.title || (authorName ? `Tweet by ${authorName}` : "No title found in oEmbed");
+    } catch (e: any) {
+        const errorMsg = `Twitter oEmbed Exception: ${e.message}`;
+        console.error(`[Debug] ${errorMsg}`);
+        return `[Debug Error] ${errorMsg}`;
     }
 }
 
