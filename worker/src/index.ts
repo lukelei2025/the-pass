@@ -81,7 +81,7 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
         // 清理末尾的作者签名和日期 (从 &mdash; 或 — 开始截断)
         content = content.replace(/(&mdash;|—).+$/s, '').trim();
 
-        // Decode HTML entities in content (e.g. &amp;)
+        // Decode HTML entities in content
         content = content
             .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
@@ -89,6 +89,42 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
             .replace(/&nbsp;/g, ' ');
+
+        // 尝试提取 t.co 链接并解析目标标题
+        // HTML 中通常是 <a href="https://t.co/...">
+        const tcoMatch = html.match(/href="(https:\/\/t\.co\/[^"]+)"/);
+        if (tcoMatch && tcoMatch[1]) {
+            const tcoUrl = tcoMatch[1];
+            try {
+                console.log(`[Debug] Resolving t.co link: ${tcoUrl}`);
+                const linkedResponse = await fetch(tcoUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+                    },
+                    redirect: 'follow'
+                });
+                if (linkedResponse.ok) {
+                    const linkedHtml = await linkedResponse.text();
+                    const linkedTitle = extractTitle(linkedHtml);
+                    if (linkedTitle) {
+                        console.log(`[Debug] Resolved linked title: ${linkedTitle}`);
+                        // 如果推文内容仅仅是链接，则直接使用文章标题
+                        // 否则保留一些推文文本
+                        const isJustLink = content.includes('https://t.co/') && content.length < 40;
+                        if (isJustLink) {
+                            return `${authorName}: "${linkedTitle}"`;
+                        } else {
+                            // 替换内容中的 t.co 链接为 标题
+                            // 这里简单追加
+                            return `${authorName}: "${linkedTitle}"`;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn(`[Debug] Failed to resolve t.co link:`, err);
+            }
+        }
 
         if (authorName && content) {
             const shortContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
