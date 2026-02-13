@@ -16,23 +16,37 @@ export default defineConfig({
         skipWaiting: true,
         // 立即控制所有客户端
         clientsClaim: true,
-        // 每次访问都检查更新（更频繁）
+
+        // ⚠️ 限制缓存范围，避免干扰 Firebase OAuth
+        // 只缓存 API 请求，不缓存 Auth 重定向
+        navigateFallbackDenylist: [
+          /^\/__\/auth\//,          // Firebase Auth 重定向
+          /^\/__\/firebase\//,        // Firebase internal
+          /^\/__/,                   // Firebase internal
+        ],
+
+        // 禁用运行时缓存以避免干扰 OAuth 流程
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/the-pass-45baf\.web\.app\/.*/i,
+            // 只缓存 API 路径，避免缓存 OAuth 相关请求
+            urlPattern: /^https:\/\/the-pass-45baf\.web\.app\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'the-pass-cache',
               expiration: {
                 maxEntries: 64,
-                maxAgeSeconds: 24 * 60 * 60 // 24 hours
+                maxAgeSeconds: 24 * 60 * 60, // 24 hours
               },
               cacheableResponse: {
                 statuses: [0, 200]
               }
             }
           }
-        ]
+        ],
+
+        // ✅ 添加 Service Worker 导航配置
+        navigateFallback: false,  // 禁用 fallback 导航
+        navigationPreload: true,  // 启用预加载
       },
       manifest: {
         name: 'The Pass',
@@ -54,6 +68,6 @@ export default defineConfig({
           }
         ]
       }
-    })
-  ],
+    }
+  ]
 })
