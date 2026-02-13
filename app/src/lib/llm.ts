@@ -19,6 +19,7 @@ export interface ContentMetadata {
     source?: string;
     platform?: string;
     originalUrl?: string;
+    resolvedUrl?: string;
     isLink: boolean;
 }
 
@@ -139,6 +140,29 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
     return null;
 }
 
+async function resolveShortLink(url: string): Promise<string> {
+    const workerUrl = buildWorkerUrl(API_ENDPOINTS.titleProxy, { url, resolve: '1' });
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT.fast);
+        const response = await fetch(workerUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            return url;
+        }
+
+        const data = await response.json() as any;
+        if (data?.resolvedUrl && typeof data.resolvedUrl === 'string') {
+            return data.resolvedUrl;
+        }
+    } catch {
+        return url;
+    }
+
+    return url;
+}
+
 /**
  * 清理平台特有的冗长标题格式
  * 注意：不移除平台后缀，因为我们会统一添加 #平台 格式
@@ -167,6 +191,7 @@ export async function classifyContent(
     const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
     const extractedUrl = urlMatch ? urlMatch[1] : null;
     const isLink = !!extractedUrl;
+    let resolvedUrl = extractedUrl;
 
     // 初始化元数据
     const metadata: ContentMetadata = {
@@ -177,15 +202,23 @@ export async function classifyContent(
 
     // 2. 如果是链接，提取更多 UI 展示所需信息
     if (isLink && extractedUrl) {
-        const platform = identifyPlatform(extractedUrl);
+        if (extractedUrl.includes('xhslink.com')) {
+            resolvedUrl = await resolveShortLink(extractedUrl);
+            if (resolvedUrl && resolvedUrl !== extractedUrl) {
+                metadata.resolvedUrl = resolvedUrl;
+                metadata.content = resolvedUrl;
+            }
+        }
+
+        const platform = identifyPlatform(resolvedUrl || extractedUrl);
         if (platform) {
             metadata.platform = platform.name;
             metadata.source = platform.name;
         }
 
-        const rawTitle = await fetchPageTitle(extractedUrl);
+        const rawTitle = await fetchPageTitle(resolvedUrl || extractedUrl);
         if (rawTitle) {
-            metadata.title = cleanPlatformTitle(rawTitle, extractedUrl);
+            metadata.title = cleanPlatformTitle(rawTitle, resolvedUrl || extractedUrl);
             console.log(`[标题获取成功] ${metadata.title}`);
         }
     }
@@ -239,4 +272,3 @@ export async function classifyContent(
 /**
  * 测试 API 连接
  */
-
