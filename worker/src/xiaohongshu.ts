@@ -28,7 +28,7 @@ const CONFIG = {
 /**
  * Main function to get Xiaohongshu info
  */
-export async function getXiaohongshuInfo(url: string, env: Env): Promise<Partial<XiaohongshuResult> | { error: string }> {
+export async function getXiaohongshuInfo(url: string, env: Env, skipCache = false): Promise<Partial<XiaohongshuResult> | { error: string }> {
     if (!isValidXiaohongshuUrl(url)) {
         return { error: 'Invalid Xiaohongshu URL' };
     }
@@ -38,8 +38,8 @@ export async function getXiaohongshuInfo(url: string, env: Env): Promise<Partial
         return { error: 'Cannot extract note ID' };
     }
 
-    // Check Cache
-    if (env.CACHE) {
+    // Check Cache (unless skipCache is true)
+    if (!skipCache && env.CACHE) {
         const cached = await env.CACHE.get(`xhs:${noteId}`, 'json') as XiaohongshuResult | null;
         // Ignore cache if title is "vlog" or invalid
         if (cached && cached.title && cached.title.toLowerCase() !== 'vlog') {
@@ -63,8 +63,8 @@ export async function getXiaohongshuInfo(url: string, env: Env): Promise<Partial
 
 async function fetchInfo(xhsUrl: string, noteId: string, apiKey?: string): Promise<Partial<XiaohongshuResult> | { error: string }> {
     const methods = [
-        methodJinaReader,
-        methodMetaTags,
+        methodMetaTags,    // 优先：直接爬取HTML meta标签
+        methodJinaReader,  // 兜底：Jina Reader
     ];
 
     for (const method of methods) {
@@ -132,14 +132,18 @@ async function methodJinaReader(xhsUrl: string, noteId: string, apiKey?: string)
 }
 
 /**
- * Method 2: Meta Tags
+ * Method 1: Meta Tags - 直接爬取HTML
  */
 async function methodMetaTags(xhsUrl: string, noteId: string, apiKey?: string): Promise<Partial<XiaohongshuResult> | { error: string }> {
     try {
         const response = await fetch(xhsUrl, {
-            headers: { 'User-Agent': CONFIG.USER_AGENT },
+            headers: {
+                'User-Agent': CONFIG.USER_AGENT,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            },
             signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-            redirect: 'follow', // Follow redirects for short links
+            redirect: 'follow',
         });
 
         if (response.status !== 200) {
@@ -148,6 +152,7 @@ async function methodMetaTags(xhsUrl: string, noteId: string, apiKey?: string): 
 
         const html = await response.text();
 
+        // 提取标题
         const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
         const descMatch = html.match(/<meta property="og:description" content="([^"]+)"/);
         const imageMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
@@ -156,13 +161,14 @@ async function methodMetaTags(xhsUrl: string, noteId: string, apiKey?: string): 
         const description = descMatch ? simpleDecodeHtml(descMatch[1]) : '';
         const image = imageMatch ? imageMatch[1] : '';
 
-        // Fallback for "vlog" title
-        if ((!title || title.toLowerCase() === 'vlog') && description) {
-            // Use start of description as title if title is useless
-            title = description.substring(0, 50) + (description.length > 50 ? '...' : '');
+        // 如果标题为空或无效，使用描述作为标题
+        if (!title || title.toLowerCase() === 'vlog') {
+            if (description) {
+                title = description.length > 50 ? description.substring(0, 50) + '...' : description;
+            }
         }
 
-        // Fallback 2: <title> tag
+        // 最后尝试 <title> 标签
         if (!title || title.toLowerCase() === 'vlog') {
             const tagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
             if (tagMatch) {
@@ -170,15 +176,84 @@ async function methodMetaTags(xhsUrl: string, noteId: string, apiKey?: string): 
             }
         }
 
-        // For meta tags, we might not get author easily without more complex parsing
-        const author = '';
+        // 尝试提取作者 - 从页面结构化数据中提取
+        let author = '';
+
+        // 方法1: 尝试从window.__INITIAL_STATE__中提取
+        let initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.+?});?/s);
+        if (!initialStateMatch) {
+            // 尝试更宽松的匹配
+            initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[^;]+)/);
+        }
+
+        if (initialStateMatch) {
+            try {
+                let jsonStr = initialStateMatch[1];
+                // 截取到合理的长度，避免过大
+                if (jsonStr.length > 100000) {
+                    jsonStr = jsonStr.substring(0, 100000);
+                }
+                jsonStr = jsonStr.replace(/undefined/g, 'null');
+
+                const data = JSON.parse(jsonStr);
+
+                // 尝试多种可能的路径
+                if (data?.note?.noteDetailMap?.[noteId]?.noteCard?.user) {
+                    const userData = data.note.noteDetailMap[noteId].noteCard.user;
+                    author = userData.nickname || userData.name || userData.username || '';
+                    console.log(`[小红书] 路径1找到作者: ${author}`);
+                }
+
+                if (!author && data?.note?.noteDetailMap) {
+                    const keys = Object.keys(data.note.noteDetailMap);
+                    if (keys.length > 0) {
+                        const firstNote = data.note.noteDetailMap[keys[0]];
+                        if (firstNote?.noteCard?.user) {
+                            author = firstNote.noteCard.user.nickname ||
+                                     firstNote.noteCard.user.name ||
+                                     firstNote.noteCard.user.username || '';
+                            console.log(`[小红书] 路径2找到作者: ${author}`);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`[小红书] 解析__INITIAL_STATE__失败:`, e.message);
+            }
+        } else {
+            console.log(`[小红书] HTML长度: ${html.length}, 未找到__INITIAL_STATE__`);
+        }
+
+        // 方法2: 尝试从其他script标签中提取数据
+        if (!author) {
+            // 查找可能包含用户信息的script标签
+            const scriptPatterns = [
+                /"nickname":"([^"]+)"/,
+                /"user":\{[^}]*"nickname":"([^"]+)"/,
+                /"username":"([^"]+)"/,
+            ];
+
+            for (const pattern of scriptPatterns) {
+                const match = html.match(pattern);
+                if (match && match[1]) {
+                    // 验证这不是一个随机字符串
+                    if (match[1].length >= 2 && match[1].length <= 50) {
+                        author = match[1];
+                        console.log(`[小红书] 从script标签找到作者: ${author}`);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 如果最终没找到作者，返回空字符串
+        // 前端会使用平台名作为兜底
 
         return {
             title,
             content: description,
             description,
             images: image ? [image] : [],
-            author: author,
+            author: author || '',
             method: 'meta_tags',
             tags: [],
             location: '',
@@ -186,6 +261,9 @@ async function methodMetaTags(xhsUrl: string, noteId: string, apiKey?: string): 
         };
 
     } catch (error: any) {
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            return { error: 'Timeout' };
+        }
         return { error: error.message };
     }
 }
@@ -208,21 +286,52 @@ function parseXiaohongshuContent(content: string): Partial<XiaohongshuResult> {
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n');
 
-    // 1. Title
-    const titleMatch = cleanContent.match(/^([^\n]+?)\s*-\s*小红书/m);
-    if (titleMatch) {
-        result.title = titleMatch[1].trim();
+    // 1. Title - 支持多种格式
+    // 格式1: "Title: xxx - 小红书"
+    const titleMatch1 = cleanContent.match(/^Title:\s*([^\n]+?)\s*-\s*小红书/m);
+    if (titleMatch1) {
+        result.title = titleMatch1[1].trim();
     }
 
-    // 2. Author
+    // 格式2: "xxx - 小红书"
+    if (!result.title) {
+        const titleMatch2 = cleanContent.match(/^([^\n]+?)\s*-\s*小红书/m);
+        if (titleMatch2) {
+            result.title = titleMatch2[1].trim();
+        }
+    }
+
+    // 格式3: "Title: xxx"（没有小红书后缀）
+    if (!result.title) {
+        const titleMatch3 = cleanContent.match(/^Title:\s*([^\n]+)/m);
+        if (titleMatch3) {
+            result.title = titleMatch3[1].trim();
+        }
+    }
+
+    // 格式4: 第一行就是标题
+    if (!result.title) {
+        const firstLine = cleanContent.split('\n')[0];
+        if (firstLine && !firstLine.includes('Title:') && !firstLine.includes('.create')) {
+            result.title = firstLine.trim();
+        }
+    }
+
+    // 2. Author - 改进解析逻辑
     const authorPatterns = [
+        // 新格式: "作者名" 在 "by" 或 "发布者" 附近
+        /by\s+([a-zA-Z0-9_]+)/i,
+        /发布者[:：]\s*([a-zA-Z0-9_]+)/,
+        /作者[:：]\s*([a-zA-Z0-9_]+)/,
+        // 旧格式: .create
         /([a-zA-Z0-9_]+\.create)/,
         /([^\s]+\.create)\s*关注/,
     ];
     for (const pattern of authorPatterns) {
         const match = cleanContent.match(pattern);
-        if (match && !result.author) {
+        if (match && match[1] && !result.author) {
             result.author = match[1];
+            break;
         }
     }
 

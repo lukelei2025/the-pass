@@ -4,6 +4,8 @@
  */
 
 import type { Category } from '../types';
+import { API_ENDPOINTS, buildWorkerUrl, REQUEST_TIMEOUT } from '../config/api';
+import { validateCategory } from './processors/contentProcessor';
 
 
 export interface LLMConfig {
@@ -68,14 +70,19 @@ export function identifyPlatform(url: string): { name: string; category: Categor
 
 /**
  * 尝试获取网页标题
+ * 统一返回格式：标题 #作者（优先）/平台（兜底）
  */
-async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | null> {
+async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default): Promise<string | null> {
+    // 识别平台
+    const platform = identifyPlatform(url);
+    const platformName = platform?.name;
+
     const isWeChat = url.includes('mp.weixin.qq.com');
+    const isXiaohongshu = url.includes('xiaohongshu.com') || url.includes('xhslink.com');
 
     // 策略 0: 如果是微信公众号，优先使用专用 Worker (抗反爬)
     if (isWeChat) {
-        // TODO: 请替换为你实际部署后的 Worker URL
-        const wechatWorkerUrl = `https://wechat-title-api.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
+        const wechatWorkerUrl = buildWorkerUrl(API_ENDPOINTS.wechatWorker, { url });
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -96,31 +103,8 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
         }
     }
 
-    // 策略 1: 本地 Vite 开发服务器代理 (仅 Dev 环境可用)
-    // 注意: Twitter/X 需要 oEmbed 支持，本地代理可能不稳定，建议 Twitter 链接直接走 Worker
-    if (import.meta.env.DEV && !url.includes('twitter.com') && !url.includes('x.com')) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-            const proxyUrl = `/api/fetch-title?url=${encodeURIComponent(url)}`;
-            const response = await fetch(proxyUrl, { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.title) {
-                    console.log(`[本地代理] 获取到标题: ${data.title}`);
-                    return data.title;
-                }
-            }
-        } catch (err) {
-            console.warn('[本地代理] 请求失败，尝试备用方案:', err);
-        }
-    }
-
-    // 策略 2: 通用 Cloudflare Worker 代理 (生产环境兜底)
-    const workerUrl = `https://workbench-title-proxy.lukelei-workbench.workers.dev/?url=${encodeURIComponent(url)}`;
+    // 策略 1: 通用 Cloudflare Worker 代理 (开发/生产环境统一)
+    const workerUrl = buildWorkerUrl(API_ENDPOINTS.titleProxy, { url });
 
     try {
         const controller = new AbortController();
@@ -132,7 +116,16 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
         if (response.ok) {
             const data = await response.json();
             if (data.title) {
-                console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`);
+                console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`, data);
+                // 如果 Worker 已经返回了格式化的标题（包含 #），直接使用
+                if (data.title.includes('#')) {
+                    return data.title;
+                }
+                // 优先使用 Worker 返回的作者（确保非空）
+                if (data.author && data.author.trim() && !data.title.includes('#')) {
+                    return `${data.title} #${data.author}`;
+                }
+                // 如果没有有效作者，只返回标题，不添加平台名
                 return data.title;
             }
         }
@@ -145,35 +138,20 @@ async function fetchPageTitle(url: string, timeoutMs = 30000): Promise<string | 
 
 /**
  * 清理平台特有的冗长标题格式
+ * 注意：不移除平台后缀，因为我们会统一添加 #平台 格式
  */
 function cleanPlatformTitle(title: string, url: string): string {
-    // GitHub: 提取 owner/repo，去掉冗长的 About
+    // GitHub: 提取 owner/repo，去掉冗长的前缀
     if (url.includes('github.com') && title.startsWith('GitHub - ')) {
         const repoMatch = title.match(/^GitHub - ([^:]+)/);
         if (repoMatch?.[1]) return repoMatch[1].trim();
     }
 
-    // 知乎/飞书等：去掉尾部平台名
-    const suffixes = [' - 知乎', ' - 飞书云文档', ' - 知乎专栏'];
-    for (const suffix of suffixes) {
-        if (title.endsWith(suffix)) return title.slice(0, -suffix.length);
-    }
+    // 其他清理（如果需要）
+    // 注意：不再移除 " - 知乎" 这样的后缀，因为我们统一使用 #平台 格式
 
     return title;
 }
-
-/**
- * 简单提取文本中的 URL
- */
-function extractUrl(input: string): string | null {
-    const match = input.match(/(https?:\/\/[^\s]+)/);
-    return match ? match[1] : null;
-}
-
-/**
- * 智能分类 - 增强版 (后端 Cloud Functions)
- */
-const CLOUDFLARE_WORKER_URL = 'https://workbench-title-proxy.lukelei-workbench.workers.dev';
 
 /**
  * 智能分类 - 增强版 (Cloudflare Worker)
@@ -183,7 +161,8 @@ export async function classifyContent(
     config: LLMConfig
 ): Promise<{ category: Category; metadata: ContentMetadata }> {
     // 1. 基础信息提取 (用于 UI 展示和 metadata)
-    const extractedUrl = extractUrl(content);
+    const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
+    const extractedUrl = urlMatch ? urlMatch[1] : null;
     const isLink = !!extractedUrl;
 
     // 初始化元数据
@@ -221,7 +200,7 @@ export async function classifyContent(
 
     // 4. 调用 Cloudflare Worker (Classify)
     try {
-        const response = await fetch(CLOUDFLARE_WORKER_URL, {
+        const response = await fetch(API_ENDPOINTS.classifyWorker, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -241,22 +220,7 @@ export async function classifyContent(
         console.log('[Worker Classify Result]:', data);
 
         if (data && data.category) {
-            const resultCategory = data.category.toLowerCase();
-            const validCategories: Category[] = ['ideas', 'work', 'personal', 'external', 'others'];
-
-            if (validCategories.includes(resultCategory)) {
-                return { category: resultCategory as Category, metadata };
-            }
-
-            // Fallback mappings
-            const mapOld: Record<string, Category> = {
-                'inspiration': 'ideas',
-                'article': 'external',
-                'other': 'others'
-            };
-            if (mapOld[resultCategory]) {
-                return { category: mapOld[resultCategory], metadata };
-            }
+            return { category: validateCategory(data.category), metadata };
         }
 
         return { category: isLink ? 'external' : 'others', metadata };

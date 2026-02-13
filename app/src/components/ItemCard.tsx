@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { copyToClipboard, generateTodoistFormat, generateNotionFormat, mapCategory } from '../lib/constants';
+import { getUrgencyIndicatorColor } from '../lib/styles/categoryStyles';
 import type { Item, Urgency } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 import ActionDrawer from './ActionDrawer';
+import CategoryTag from './ui/CategoryTag';
 
 interface ItemCardProps {
   item: Item;
@@ -15,16 +18,11 @@ interface ItemCardProps {
 export default function ItemCard({ item, urgency, remainingText }: ItemCardProps) {
   const { updateItem } = useStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const safeCategory = mapCategory(item.category); // Map old data to new types
+  const safeCategory = mapCategory(item.category);
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
 
-  // Status Colors
-  const indicatorColor = {
-    normal: 'bg-[#34C759]',
-    warning: 'bg-[#FF9F0A]',
-    alert: 'bg-[#FF3B30]',
-    urgent: 'bg-[#FF3B30] animate-pulse',
-  }[urgency];
+  const indicatorColor = getUrgencyIndicatorColor(urgency);
 
   const handleAction = async (action: 'cooked' | 'todo' | 'frozen' | 'composted') => {
     let copied = false;
@@ -39,25 +37,19 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
 
   return (
     <div
-      onClick={() => window.innerWidth < 768 && setIsDrawerOpen(true)}
+      onClick={() => isMobile && setIsDrawerOpen(true)}
       className="group flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-200 relative overflow-hidden cursor-pointer md:cursor-default"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {/* Category Tag */}
-          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide 
-            ${safeCategory === 'ideas' ? 'bg-[var(--bg-tag-orange)] text-[var(--color-orange)]' :
-              safeCategory === 'work' ? 'bg-[var(--bg-tag-blue)] text-[var(--color-blue)]' :
-                safeCategory === 'personal' ? 'bg-[var(--bg-tag-green)] text-[var(--color-green)]' :
-                  safeCategory === 'external' ? 'bg-[var(--bg-tag-purple)] text-[var(--color-purple)]' :
-                    'bg-[var(--bg-tag-gray)] text-[var(--color-gray)]'
-            }`}>
+          <CategoryTag category={safeCategory}>
             {t.categories[safeCategory]}
-          </span>
+          </CategoryTag>
 
           {/* Platform Tag */}
           {item.type === 'link' && item.source && !item.source.startsWith('http') && (
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
+            <span className="px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
               {item.source}
             </span>
           )}
@@ -108,22 +100,22 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       )}
 
       {/* Desktop Hover Actions */}
-      <div className="hidden md:flex absolute bottom-0 left-0 right-0 p-2 bg-white/95 backdrop-blur-sm border-t border-[var(--color-border)] opacity-0 group-hover:opacity-100 transition-opacity duration-200 gap-1.5">
+      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-[var(--color-border)] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button onClick={(e) => { e.stopPropagation(); handleAction('cooked'); }} title={`${t.actions.clear} (Cmd+Enter)`} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-green)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
-          <span className="text-[10px] font-semibold">{t.actions.clear}</span>
+          <span className="text-[11px] font-semibold">{t.actions.clear}</span>
         </button>
         <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title={t.actions.todo} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
-          <span className="text-[10px] font-semibold">{t.actions.todo}</span>
+          <span className="text-[11px] font-semibold">{t.actions.todo}</span>
         </button>
         <button onClick={(e) => { e.stopPropagation(); handleAction('frozen'); }} title={t.actions.stash} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
-          <span className="text-[10px] font-semibold">{t.actions.stash}</span>
+          <span className="text-[11px] font-semibold">{t.actions.stash}</span>
         </button>
         <button onClick={(e) => { e.stopPropagation(); handleAction('composted'); }} title={t.actions.void} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-red)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
-          <span className="text-[10px] font-semibold">{t.actions.void}</span>
+          <span className="text-[11px] font-semibold">{t.actions.void}</span>
 
         </button>
       </div>

@@ -1,5 +1,6 @@
 import type { Item } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
+import { createPortal } from 'react-dom';
 
 interface ActionDrawerProps {
     item: Item;
@@ -12,16 +13,16 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
     const { t } = useTranslation();
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/40 z-[60] animate-in fade-in duration-200"
+                className="fixed inset-0 bg-black/40 z-[9998] animate-in fade-in duration-200"
                 onClick={onClose}
             />
 
             {/* Bottom Sheet */}
-            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-white rounded-t-[20px] pb-[env(safe-area-inset-bottom)] p-4 animate-in slide-in-from-bottom duration-300">
+            <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-[20px] p-4 animate-in slide-in-from-bottom duration-300">
                 <div className="w-12 h-1.5 bg-[rgba(0,0,0,0.1)] rounded-full mx-auto mb-6" />
 
                 <div className="grid grid-cols-4 gap-4 pb-4">
@@ -67,5 +68,5 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
                 </div>
             </div>
         </>
-    );
+        , document.body);
 }
