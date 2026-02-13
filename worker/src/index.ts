@@ -1,460 +1,122 @@
 /**
- * Cloudflare Worker: 服务端标题抓取代理
+ * Cloudflare Worker - 统一标题抓取入口
  *
- * 功能：
- * 1. 通用网页标题抓取 (基于 User-Agent)
- * 2. Twitter/X 专用增强抓取 (基于 Jina Reader API)
- *
- * 逻辑整合了原有的通用抓取能力和 Jina Reader 解析能力。
+ * 路由到相应的平台处理器
  */
 
-import { getXiaohongshuInfo } from './xiaohongshu';
+import { WeChatPlatform } from './platforms/wechat';
+import { TwitterPlatform } from './platforms/twitter';
+import { XiaohongshuPlatform } from './platforms/xiaohongshu';
+import { DouyinPlatform } from './platforms/douyin';
+import { GenericPlatform } from './platforms/generic';
+import { createCorsHeaders, createOptionsResponse } from './utils/cors';
+import { Env, TitleResult } from './platforms/base';
 import { CLASSIFICATION_RULES } from './classification-rules';
 
-// ==========================================
-// 配置和工具函数
-// ==========================================
-
-// 定义 Env 接口
-export interface Env {
-    TWITTER_BEARER_TOKEN?: string; // Twitter API v2 Bearer Token (推荐配置，用于获取推文)
-    GLM_API_KEY?: string;
-    JINA_API_KEY?: string; // Jina Reader API Key (可选，Twitter API失败时的兜底)
-    CACHE?: KVNamespace;
-}
-
-// 通用 User-Agent 列表
-const USER_AGENTS = [
-    'Googlebot/2.1 (+http://www.google.com/bot.html)',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+// 平台处理器列表（按优先级排序）
+const PLATFORMS = [
+    new WeChatPlatform(),
+    new TwitterPlatform(),
+    new XiaohongshuPlatform(),
+    new DouyinPlatform(),
+    new GenericPlatform(), // 兜底
 ];
 
-// 配置
-const CONFIG = {
-    CACHE_TTL: 300, // 缓存5分钟
-    TIMEOUT: 10000, // 10秒超时
+export default {
+    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+        const url = new URL(request.url);
+        const targetUrl = url.searchParams.get('url');
+
+        // 处理 OPTIONS 请求
+        if (request.method === 'OPTIONS') {
+            return createOptionsResponse();
+        }
+
+        // 如果是 POST 且没有 url 参数，则作为分类请求
+        if (request.method === 'POST' && !targetUrl) {
+            return handleClassify(request, env);
+        }
+
+        // 标题抓取请求：路由到对应平台
+        if (!targetUrl) {
+            return new Response(JSON.stringify({ title: null, author: null }), {
+                status: 400,
+                headers: createCorsHeaders(),
+            });
+        }
+
+        // 遍历平台处理器，返回第一个能处理的
+        for (const platform of PLATFORMS) {
+            if (platform.canHandle(targetUrl)) {
+                const result = await platform.fetchTitle(targetUrl, env);
+                const response = result.title
+                    ? JSON.stringify(result)
+                    : JSON.stringify({ title: null, author: null });
+                return new Response(response, {
+                    headers: {
+                        ...createCorsHeaders(),
+                        'Cache-Control': result.cached ? 'public, max-age=3600' : 'no-cache',
+                    },
+                });
+            }
+        }
+
+        // 不应该到这里，因为 GenericPlatform.canHandle() 永远返回 true
+        return new Response(JSON.stringify({ error: 'No platform handler found' }), {
+            status: 500,
+            headers: createCorsHeaders(),
+        });
+    }
 };
-
-/**
- * HTML 实体解码
- */
-function decodeEntities(text: string | null) {
-    if (!text) return '';
-    return text
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ');
-}
-
-/**
- * 提取网页标题
- */
-function extractTitle(html: string | null) {
-    if (!html) return null;
-
-    let title: string | null = null;
-
-    // 1. og:title (最可靠)
-    const ogMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    if (ogMatch && ogMatch[1]) {
-        title = decodeEntities(ogMatch[1].trim());
-    }
-
-    // 2. WeChat 特有
-    if (!title) {
-        const msgMatch = html.match(/msg_title\s*=\s*(?:window\.title\s*=\s*)?["']([^"']+)["']/);
-        if (msgMatch && msgMatch[1]) title = decodeEntities(msgMatch[1].trim());
-    }
-
-    // 3. <title> 标签
-    if (!title) {
-        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        if (titleMatch && titleMatch[1]) {
-            title = decodeEntities(titleMatch[1].trim());
-        }
-    }
-
-    // 4. h1 fallback
-    if (!title) {
-        const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-        if (h1Match && h1Match[1]) {
-            const clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
-            if (clean) title = decodeEntities(clean);
-        }
-    }
-
-    // Cleanup for Xiaohongshu
-    if (title && (html.includes('xiaohongshu.com') || html.includes('Red - The Little Red Book'))) {
-        title = title.replace(/\s*-\s*小红书$/, '');
-    }
-
-    return title;
-}
-
-/**
- * 从 HTML 中提取作者信息
- */
-function extractAuthor(html: string, url: string): string | null {
-    // 1. twitter:creator
-    const twitterCreator = html.match(/<meta[^>]*name=["']twitter:creator["'][^>]*content=["']([^"']+)["']/i);
-    if (twitterCreator && twitterCreator[1]) {
-        return twitterCreator[1].replace(/^@/, '');
-    }
-
-    // 2. og:article:author
-    const articleAuthor = html.match(/<meta[^>]*property=["']og:article:author["'][^>]*content=["']([^"']+)["']/i);
-    if (articleAuthor && articleAuthor[1]) {
-        return articleAuthor[1];
-    }
-
-    // 3. article:author
-    const articleAuthor2 = html.match(/<meta[^>]*name=["']article:author["'][^>]*content=["']([^"']+)["']/i);
-    if (articleAuthor2 && articleAuthor2[1]) {
-        return articleAuthor2[1];
-    }
-
-    // 4. author meta
-    const authorMeta = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
-    if (authorMeta && authorMeta[1]) {
-        return authorMeta[1];
-    }
-
-    // 5. 飞书文档作者
-    if (url.includes('feishu.cn') || url.includes('feishu.com')) {
-        console.log(`[飞书] HTML长度: ${html.length}`);
-
-        // 搜索可能包含用户信息的模式
-        const patterns = [
-            /"owner"\s*:\s*"([^"]+)"/i,
-            /"ownerName"\s*:\s*"([^"]+)"/i,
-            /"creator"\s*:\s*"([^"]+)"/i,
-            /"createdBy"\s*:\s*"([^"]+)"/i,
-            /"userName"\s*:\s*"([^"]+)"/i,
-            /"name"\s*:\s*"([^"]+)"\s*"type"\s*:\s*"user"/i,
-        ];
-
-        for (const pattern of patterns) {
-            const match = html.match(pattern);
-            if (match && match[1]) {
-                console.log(`[飞书] 找到用户: ${match[1]}`);
-                return match[1];
-            }
-        }
-
-        // 尝试从 window.g_initialProps 提取
-        const scriptMatch = html.match(/window\.g_initialProps\s*=\s*({.+?});?/s);
-        if (scriptMatch) {
-            console.log(`[飞书] 找到g_initialProps`);
-            try {
-                const props = JSON.parse(scriptMatch[1]);
-                console.log(`[飞书] props keys:`, Object.keys(props || {}));
-                if (props?.doc?.author) {
-                    console.log(`[飞书] 找到作者: ${props.doc.author}`);
-                    return props.doc.author;
-                }
-                if (props?.author) {
-                    console.log(`[飞书] 找到作者: ${props.author}`);
-                    return props.author;
-                }
-            } catch (e) {
-                console.log(`[飞书] 解析g_initialProps失败: ${e.message}`);
-            }
-        }
-
-        // 尝试从 meta 标签提取
-        const feishuAuthor = html.match(/<meta[^>]*property=["']og:article:author["'][^>]*content=["']([^"']+)["']/i);
-        if (feishuAuthor && feishuAuthor[1]) {
-            console.log(`[飞书] 从meta找到作者: ${feishuAuthor[1]}`);
-            return feishuAuthor[1];
-        }
-
-        // 尝试其他可能的字段
-        const creatorMatch = html.match(/<meta[^>]*name=["']creator["'][^>]*content=["']([^"']+)["']/i);
-        if (creatorMatch && creatorMatch[1]) {
-            console.log(`[飞书] 从creator找到作者: ${creatorMatch[1]}`);
-            return creatorMatch[1];
-        }
-
-        console.log(`[飞书] 未找到作者信息`);
-    }
-
-    // 6. 知乎作者
-    const zhihuAuthor = html.match(/<span class=["']AuthorInfo-name[^>]*>([^<]+)<\/span>/i);
-    if (zhihuAuthor && zhihuAuthor[1]) {
-        return zhihuAuthor[1].trim();
-    }
-
-    // 7. B站 UP主
-    const biliAuthor = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
-    if (biliAuthor && biliAuthor[1]) {
-        return biliAuthor[1];
-    }
-
-    // 8. GitHub repo owner
-    if (url.includes('github.com')) {
-        const match = url.match(/github\.com\/([^\/]+)/);
-        if (match) return match[1];
-    }
-
-    return null;
-}
-
-// ==========================================
-// Twitter / X 专用处理
-// ==========================================
-
-/**
- * 从 URL 提取 Tweet ID
- */
-function extractTweetId(url: string) {
-    const patterns = [
-        /twitter\.com\/\w+\/status\/(\d+)/,
-        /x\.com\/\w+\/status\/(\d+)/,
-        /mobile\.twitter\.com\/\w+\/status\/(\d+)/,
-    ];
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) return match[1];
-    }
-    return null;
-}
-
-/**
- * Twitter API v2 策略 - 官方API，最可靠
- */
-async function fetchTweetWithTwitterAPI(tweetId: string, bearerToken: string) {
-    try {
-        const apiUrl = `https://api.twitter.com/2/tweets/${tweetId}?expansions=author_id&user.fields=username,name,verified&tweet_fields=created_at,public_metrics`;
-
-        const response = await fetch(apiUrl, {
-            headers: {
-                'Authorization': `Bearer ${bearerToken}`,
-            },
-            signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-        });
-
-        if (response.status === 401) {
-            return { error: 'Invalid or expired Bearer Token' };
-        }
-        if (response.status === 403) {
-            return { error: 'Access forbidden - check API permissions' };
-        }
-        if (response.status === 404) {
-            return { error: 'Tweet not found or deleted' };
-        }
-        if (response.status === 429) {
-            return { error: 'Rate limit exceeded' };
-        }
-        if (response.status !== 200) {
-            return { error: `HTTP ${response.status}` };
-        }
-
-        const data = await response.json() as any;
-
-        if (!data.data) {
-            return { error: 'No tweet data returned' };
-        }
-
-        const tweet = data.data;
-        const user = data.includes?.users?.[0];
-
-        if (!user) {
-            return { error: 'No user data returned' };
-        }
-
-        return {
-            author: user.username,
-            username: user.username,
-            displayName: user.name,
-            title: tweet.text || '',
-            verified: user.verified || false,
-            createdAt: tweet.created_at || null,
-            metrics: tweet.public_metrics || null,
-            method: 'twitter_api_v2',
-        };
-    } catch (error: any) {
-        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-            return { error: 'Timeout' };
-        }
-        return { error: error.message };
-    }
-}
-
-/**
- * Jina Reader 策略 - 兜底方法
- */
-async function fetchTweetWithJina(tweetUrl: string, apiKey: string | null | undefined = null) {
-    try {
-        // 关键：使用 http:// 前缀的格式（这是旧代码成功的方式）
-        const cleanUrl = tweetUrl.replace(/^https?:\/\//, '');
-        const jinaUrl = `https://r.jina.ai/http://${cleanUrl}`;
-
-        const headers: Record<string, string> = {
-            'User-Agent': 'Mozilla/5.0 (compatible; TwitterScraper/1.0)',
-        };
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
-        }
-
-        const response = await fetch(jinaUrl, {
-            headers,
-            signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-        });
-
-        if (response.status === 429) {
-            return { error: 'Rate limit exceeded' };
-        }
-        if (response.status !== 200) {
-            return { error: `HTTP ${response.status}` };
-        }
-
-        const content = await response.text();
-
-        // 从 URL 提取用户名
-        const urlMatch = tweetUrl.match(/(?:twitter|x)\.com\/(\w+)\/status/);
-        const username = urlMatch ? urlMatch[1] : 'unknown';
-
-        const lines = content.split('\n');
-        const titleLine = lines[0] || '';
-
-        // 提取推文内容 - 旧代码的解析逻辑
-        const contentMatch = titleLine.match(/"(.+?)"(?:\s*\/\s*X)?$/);
-        let title = contentMatch ? contentMatch[1] : titleLine;
-
-        if (!contentMatch) {
-            const titleMatch = titleLine.match(/:\s*"(.+)"/);
-            title = titleMatch ? titleMatch[1] : titleLine;
-        }
-
-        // 提取作者
-        const authorMatch = titleLine.match(/Title:\s*(.+?)\s+on X:/);
-        const author = authorMatch ? authorMatch[1] : username;
-
-        // 清理标题
-        if (title.startsWith('Title: ')) {
-            title = title.slice(7);
-        }
-
-        // 检查内容是否有效
-        if (!title || title.length < 5 || ['X', 'Twitter', 'Post', 'JavaScript', 'Don'].some(p => title.toLowerCase().includes(p.toLowerCase()))) {
-            return { error: 'No valid content extracted' };
-        }
-
-        return {
-            author,
-            username,
-            title,
-            method: 'jina_reader',
-        };
-    } catch (error: any) {
-        return { error: error.message };
-    }
-}
-
-/**
- * Twitter 聚合获取逻辑
- * 优先级: Twitter API v2 > Jina Reader > URL兜底
- */
-async function getTweetInfo(
-    tweetUrl: string,
-    bearerToken: string | null | undefined = null,
-    jinaApiKey: string | null | undefined = null
-) {
-    // 从 URL 提取 Tweet ID 和用户名
-    const urlMatch = tweetUrl.match(/(?:twitter|x)\.com\/(\w+)\/status\/(\d+)/);
-    const fallbackUsername = urlMatch ? urlMatch[1] : null;
-    const tweetId = urlMatch ? urlMatch[2] : null;
-
-    // 方法 1: Twitter API v2 (最可靠)
-    if (tweetId && bearerToken) {
-        console.log(`[Twitter] Trying Twitter API v2 for tweet ${tweetId}...`);
-        const apiResult = await fetchTweetWithTwitterAPI(tweetId, bearerToken);
-
-        if (apiResult && !apiResult.error && apiResult.title) {
-            console.log(`[Twitter] Success with Twitter API v2:`, apiResult);
-            return apiResult;
-        }
-
-        console.warn(`[Twitter] API v2 failed:`, apiResult?.error);
-    } else if (!bearerToken) {
-        console.warn(`[Twitter] No Bearer Token configured, skipping API v2`);
-    }
-
-    // 方法 2: Jina Reader (兜底)
-    console.log(`[Twitter] Trying Jina Reader...`);
-    const jinaResult = await fetchTweetWithJina(tweetUrl, jinaApiKey);
-
-    if (jinaResult && !jinaResult.error && jinaResult.title) {
-        console.log(`[Twitter] Success with Jina Reader:`, jinaResult);
-        return jinaResult;
-    }
-
-    console.warn(`[Twitter] Jina Reader failed:`, jinaResult?.error);
-
-    // 方法 3: URL 兜底 (最后手段)
-    if (fallbackUsername) {
-        console.warn(`[Twitter] Using fallback: @${fallbackUsername}`);
-        return {
-            author: fallbackUsername,
-            username: fallbackUsername,
-            title: '推文内容', // 无法获取具体内容
-            method: 'fallback',
-        };
-    }
-
-    return null;
-}
-
-// ==========================================
-// 分类处理
-// ==========================================
 
 /**
  * 处理分类请求
  */
 async function handleClassify(request: Request, env: Env): Promise<Response> {
     try {
-        const apiKey = env.GLM_API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ error: "Server misconfiguration: API key not found" }), {
-                status: 500,
-                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-            });
-        }
-
         const body = await request.json() as any;
         const { content, metadata } = body;
 
         if (!content) {
-            return new Response(JSON.stringify({ error: "Missing content" }), {
+            return new Response(JSON.stringify({ error: 'Missing content' }), {
                 status: 400,
-                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+                headers: createCorsHeaders(),
             });
         }
 
-        const GLM_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+        // 调用 LLM 进行分类
+        const glmApiKey = env.GLM_API_KEY;
+        if (!glmApiKey) {
+            return new Response(JSON.stringify({ error: 'GLM API key not configured' }), {
+                status: 500,
+                headers: createCorsHeaders(),
+            });
+        }
 
         const prompt = `
 ${CLASSIFICATION_RULES}
 
-用户原始输入: """${content.replace(/"/g, '\\"')}"""
-${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl}, 标题 "${(metadata.title || '').replace(/"/g, '\\"')}")` : ''}
+---
 
-请严格遵守 JSON 格式返回，确保所有字符串内的双引号都经过转义（\"），不要包含 Markdown 标记：
+Input Content / 用户输入原文:
+"""
+${content}
+"""
+
+Metadata / 元数据:
+${JSON.stringify(metadata || {}, null, 2)}
+
+请严格遵守 JSON 格式返回，确保所有字符串内的双引号都经过转义（\\"），不要包含 Markdown 标记：
 {
-  "reasoning": "你的思考过程...",
   "category": "category_key"
 }
 `;
 
-        const response = await fetch(GLM_API_URL, {
+        const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${glmApiKey}`,
             },
             body: JSON.stringify({
                 model: 'glm-4',
@@ -466,21 +128,22 @@ ${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl},
 
         if (!response.ok) {
             const errorText = await response.text();
-            return new Response(JSON.stringify({ error: "GLM API Failed", details: errorText }), {
+            return new Response(JSON.stringify({ error: 'GLM API Failed', details: errorText }), {
                 status: 500,
-                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+                headers: createCorsHeaders(),
             });
         }
 
         const data = await response.json() as any;
         let rawContent = data.choices?.[0]?.message?.content?.trim();
 
+        // 提取 JSON
         const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             rawContent = jsonMatch[0];
         }
 
-        rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        rawContent = rawContent.replace(/^```json\s*/, '').replace(/^```\s*/, '');
 
         let result;
         try {
@@ -488,412 +151,25 @@ ${metadata?.isLink ? `(系统检测事实: 包含链接 ${metadata.originalUrl},
         } catch (e) {
             result = {
                 category: 'others',
-                reasoning: 'JSON Parse Error, Raw: ' + rawContent
+                reasoning: 'JSON Parse Error, Raw: ' + rawContent,
+            };
+        }
+
+        const allowedCategories = new Set(['ideas', 'work', 'personal', 'external', 'others']);
+        if (!result || typeof result.category !== 'string' || !allowedCategories.has(result.category)) {
+            result = {
+                category: metadata?.isLink ? 'external' : 'others',
+                reasoning: 'Invalid category from model, fallback applied',
             };
         }
 
         return new Response(JSON.stringify(result), {
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            headers: createCorsHeaders(),
         });
-
     } catch (error: any) {
-        return new Response(JSON.stringify({ error: "Internal Error", details: error.message }), {
+        return new Response(JSON.stringify({ error: 'Internal Error', details: error.message }), {
             status: 500,
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            headers: createCorsHeaders(),
         });
     }
 }
-
-// ==========================================
-// 主入口
-// ==========================================
-
-export default {
-    async fetch(request: Request, env: Env, ctx: any) {
-        // CORS
-        if (request.method === "OPTIONS") {
-            return new Response(null, {
-                headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type",
-                },
-            });
-        }
-
-        const url = new URL(request.url);
-        const targetUrl = url.searchParams.get("url");
-
-        // POST 且没有 url 参数 = 分类请求
-        if (request.method === "POST" && !targetUrl) {
-            return handleClassify(request, env);
-        }
-
-        if (!targetUrl) {
-            return new Response(JSON.stringify({ error: "Missing url parameter" }), {
-                status: 400,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            });
-        }
-
-        // ==========================================
-        // 1. Twitter / X 专用
-        // ==========================================
-        if (targetUrl.includes('x.com/') || targetUrl.includes('twitter.com/')) {
-            const tweetId = extractTweetId(targetUrl);
-
-            // KV 缓存
-            if (tweetId && env.CACHE) {
-                const cached = await env.CACHE.get(`tweet:${tweetId}`, 'json');
-                if (cached) {
-                    const titleStr = `"${cached.title}" #${cached.author}`;
-                    return new Response(JSON.stringify({ title: titleStr, cached: true }), {
-                        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600" }
-                    });
-                }
-            }
-
-            const tweetInfo = await getTweetInfo(targetUrl, env.TWITTER_BEARER_TOKEN, env.JINA_API_KEY);
-
-            if (tweetInfo) {
-                // 写入缓存
-                if (tweetId && env.CACHE) {
-                    ctx.waitUntil(env.CACHE.put(`tweet:${tweetId}`, JSON.stringify(tweetInfo), {
-                        expirationTtl: CONFIG.CACHE_TTL,
-                    }));
-                }
-
-                const titleStr = `"${tweetInfo.title}" #${tweetInfo.author}`;
-                return new Response(JSON.stringify({ title: titleStr }), {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "public, max-age=3600"
-                    },
-                });
-            }
-        }
-
-        // ==========================================
-        // 2. 小红书专用
-        // ==========================================
-        if (targetUrl.includes('xiaohongshu.com') || targetUrl.includes('xhslink.com')) {
-            const skipCache = url.searchParams.get('nocache') === 'true';
-            const result = await getXiaohongshuInfo(targetUrl, env, skipCache);
-
-            if (result && !('error' in result)) {
-                let cleanTitle = result.title.replace(/\s*-\s*小红书$/, '');
-
-                // 移除可能残留的 "Title: " 前缀
-                if (cleanTitle.startsWith('Title: ')) {
-                    cleanTitle = cleanTitle.slice(7);
-                }
-
-                return new Response(JSON.stringify({
-                    title: cleanTitle,
-                    author: result.author || '',
-                }), {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "public, max-age=3600"
-                    },
-                });
-            }
-        }
-
-        // ==========================================
-        // 2.5 飞书专用 - 使用 Jina Reader
-        // ==========================================
-        if (targetUrl.includes('feishu.cn') || targetUrl.includes('feishu.com')) {
-            console.log(`[飞书] 尝试使用 Jina Reader 获取`);
-
-            try {
-                const cleanUrl = targetUrl.replace(/^https?:\/\//, '');
-                const jinaUrl = `https://r.jina.ai/http://${cleanUrl}`;
-
-                const headers: Record<string, string> = {
-                    'User-Agent': 'Mozilla/5.0 (compatible; FeishuScraper/1.0)',
-                };
-                if (env.JINA_API_KEY) {
-                    headers['Authorization'] = `Bearer ${env.JINA_API_KEY}`;
-                }
-
-                const response = await fetch(jinaUrl, {
-                    headers,
-                    signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-                });
-
-                if (response.status === 200) {
-                    const content = await response.text();
-                    console.log(`[飞书] Jina Reader 返回长度: ${content.length}`);
-
-                    // 从 Jina Reader 返回的文本中提取作者
-                    // 飞书文档可能包含 "创建者："、"作者："等信息
-                    const authorPatterns = [
-                        /创建者[：:]\s*([^\n\r]+)/i,
-                        /作者[：:]\s*([^\n\r]+)/i,
-                        /by\s+([^\n\r]+)/i,
-                        /文档所有者[：:]\s*([^\n\r]+)/i,
-                    ];
-
-                    let author = '';
-                    for (const pattern of authorPatterns) {
-                        const match = content.match(pattern);
-                        if (match && match[1].trim()) {
-                            author = match[1].trim();
-                            console.log(`[飞书] 从 Jina Reader 找到作者: ${author}`);
-                            break;
-                        }
-                    }
-
-                    // 提取标题（第一行）
-                    let title = content.split('\n')[0].trim();
-
-                    // 清理标题
-                    title = title.replace(/^Title:\s*/i, ''); // 移除 "Title:" 前缀
-                    title = title.replace(/\s*-\s*Feishu\s*Docs$/i, ''); // 移除 " - Feishu Docs" 后缀
-                    title = title.substring(0, 100); // 截断到100字符
-
-                    return new Response(JSON.stringify({
-                        title: title,
-                        author: author,
-                    }), {
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Access-Control-Allow-Origin": "*",
-                            "Cache-Control": "public, max-age=3600"
-                        },
-                    });
-                }
-            } catch (e) {
-                console.log(`[飞书] Jina Reader 失败: ${e.message}`);
-            }
-        }
-
-        // ==========================================
-        // 2.6 抖音专用
-        // ==========================================
-        if (targetUrl.includes('douyin.com') || targetUrl.includes('v.douyin.com')) {
-            console.log(`[抖音] 检测到抖音链接: ${targetUrl}`);
-
-            // 先尝试直接抓取HTML
-            try {
-                const response = await fetch(targetUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
-                    },
-                    redirect: 'follow',
-                    signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-                });
-
-                if (response.ok) {
-                    const html = await response.text();
-                    console.log(`[抖音] HTML长度: ${html.length}`);
-
-                    // 优先尝试从 window._ROUTER_DATA 中提取数据
-                    const routerDataMatch = html.match(/window\._ROUTER_DATA\s*=\s*({.+?});?\s*<\/script>/s);
-                    if (routerDataMatch) {
-                        console.log(`[抖音] 找到 _ROUTER_DATA`);
-                        try {
-                            // 解码 Unicode 转义字符
-                            let jsonStr = routerDataMatch[1];
-                            // 将 \u002F 等转义字符还原
-                            jsonStr = jsonStr.replace(/\\u002F/g, '/').replace(/\\u003C/g, '<').replace(/\\u003E/g, '>').replace(/\\u0026/g, '&');
-
-                            const data = JSON.parse(jsonStr);
-
-                            // 从 loaderData.video_(id)/page.videoInfoRes.item_list[0] 获取数据
-                            const videoData = data?.loaderData?.['video_(id)/page']?.videoInfoRes?.item_list?.[0];
-                            if (videoData) {
-                                let title = videoData.desc || '';
-                                const author = videoData.author?.nickname || '';
-
-                                // 清理标题：移除多余空格
-                                title = title.replace(/\s+/g, ' ').trim();
-
-                                // 处理话题标签：
-                                // 通过移除话题标签后是否为空来判断是否全为话题标签
-                                const withoutHashtags = title.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim();
-                                const isAllHashtags = withoutHashtags === '';
-
-                                if (isAllHashtags) {
-                                    // 全是话题标签，将 # 转为空格
-                                    title = title.replace(/#/g, ' ').replace(/\s+/g, ' ').trim();
-                                } else {
-                                    // 有实际内容，使用移除话题标签后的内容
-                                    title = withoutHashtags;
-                                }
-
-                                // 截取前20个字符
-                                if (title.length > 20) {
-                                    title = title.substring(0, 20) + '...';
-                                }
-
-                                console.log(`[抖音] 从 _ROUTER_DATA 提取 - 标题: ${title}, 作者: ${author}`);
-
-                                return new Response(JSON.stringify({
-                                    title: title,
-                                    author: author,
-                                }), {
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                        "Access-Control-Allow-Origin": "*",
-                                        "Cache-Control": "public, max-age=3600"
-                                    },
-                                });
-                            }
-                        } catch (e) {
-                            console.log(`[抖音] 解析 _ROUTER_DATA 失败: ${e.message}`);
-                        }
-                    }
-
-                    // 备用方案：尝试直接从 JSON 字符串中提取 desc 和 nickname
-                    const descMatch = html.match(/"desc"\s*:\s*"([^"]+)"/);
-                    const nicknameMatch = html.match(/"nickname"\s*:\s*"([^"]+)"/);
-
-                    if (descMatch || nicknameMatch) {
-                        let title = descMatch ? decodeEntities(descMatch[1]) : '';
-                        const author = nicknameMatch ? nicknameMatch[1] : '';
-
-                        // 清理话题标签 (#xxx)
-                        title = title.replace(/#[^\s#]+/g, '').trim();
-
-                        // 移除多余空格
-                        title = title.replace(/\s+/g, ' ');
-
-                        // 截取前80个字符
-                        if (title.length > 80) {
-                            title = title.substring(0, 80) + '...';
-                        }
-
-                        console.log(`[抖音] 从 JSON 提取 - 标题: ${title}, 作者: ${author}`);
-
-                        return new Response(JSON.stringify({
-                            title: title,
-                            author: author,
-                        }), {
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Access-Control-Allow-Origin": "*",
-                                "Cache-Control": "public, max-age=3600"
-                            },
-                        });
-                    }
-
-                    console.log(`[抖音] 未找到有效数据`);
-                }
-            } catch (e) {
-                console.log(`[抖音] 直接抓取失败: ${e.message}`);
-            }
-
-            // 如果直接抓取失败，尝试 Jina Reader
-            try {
-                const cleanUrl = targetUrl.replace(/^https?:\/\//, '');
-                const jinaUrl = `https://r.jina.ai/http://${cleanUrl}`;
-                console.log(`[抖音] 尝试 Jina Reader`);
-
-                const headers: Record<string, string> = {};
-                if (env.JINA_API_KEY) {
-                    headers['Authorization'] = `Bearer ${env.JINA_API_KEY}`;
-                }
-
-                const response = await fetch(jinaUrl, {
-                    headers,
-                    signal: AbortSignal.timeout(CONFIG.TIMEOUT),
-                });
-
-                if (response.status === 200) {
-                    const content = await response.text();
-                    let title = content.split('\n')[0];
-
-                    // 移除 " - 抖音" 后缀
-                    title = title.replace(/\s*-\s*抖音$/, '');
-
-                    // 清理话题标签
-                    title = title.replace(/#\S+\s*/g, ' ').trim();
-
-                    // 移除复制链接引导语
-                    title = title.replace(/复制此链接.*$/, '').trim();
-
-                    // 截取前80个字符
-                    if (title.length > 80) {
-                        title = title.substring(0, 80) + '...';
-                    }
-
-                    console.log(`[抖音] Jina 标题: ${title}`);
-
-                    return new Response(JSON.stringify({
-                        title: title,
-                        author: '',
-                    }), {
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Access-Control-Allow-Origin": "*",
-                        },
-                    });
-                }
-            } catch (e) {
-                console.log(`[抖音] Jina Reader 失败: ${e.message}`);
-            }
-        }
-
-        // ==========================================
-        // 3. 通用网页抓取
-        // ==========================================
-        // 跳过已经特殊处理的平台
-        if (targetUrl.includes('x.com/') || targetUrl.includes('twitter.com/') ||
-            targetUrl.includes('xiaohongshu.com') || targetUrl.includes('xhslink.com') ||
-            targetUrl.includes('feishu.cn') || targetUrl.includes('feishu.com') ||
-            targetUrl.includes('douyin.com') || targetUrl.includes('v.douyin.com')) {
-            // 这些平台已有专门处理，不使用通用抓取
-        } else {
-            for (const ua of USER_AGENTS) {
-                try {
-                    const isXhsLink = targetUrl.includes('xhslink.com');
-                    const fetchHeaders = {
-                        "User-Agent": isXhsLink
-                            ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
-                            : ua,
-                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-                        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                    };
-
-                    const response = await fetch(targetUrl, {
-                        headers: fetchHeaders,
-                        redirect: "follow",
-                        cf: { cacheTtl: 3600, cacheEverything: true },
-                    } as any);
-
-                    if (!response.ok) continue;
-
-                    const finalUrl = response.url;
-                    const html = await response.text();
-
-                    const title = extractTitle(html);
-                    const author = extractAuthor(html, finalUrl);
-
-                    if (title && !title.includes("该页面不存在") && !title.includes("访问受限")) {
-                        return new Response(JSON.stringify({ title, author }), {
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Access-Control-Allow-Origin": "*",
-                                "Cache-Control": "public, max-age=3600"
-                            },
-                        });
-                    }
-                } catch (err) {
-                    // Ignore
-                }
-            }
-        }
-
-        return new Response(JSON.stringify({ title: null, author: null }), {
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        });
-    },
-};

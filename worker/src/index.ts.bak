@@ -717,20 +717,21 @@ export default {
                                 title = title.replace(/\s+/g, ' ').trim();
 
                                 // 处理话题标签：
-                                // 1. 如果标题全是话题标签格式（#开头，中间只有空格），则转换为可读形式
-                                // 2. 如果标题包含实际内容，则移除话题标签
-                                const isAllHashtags = /^([#\p{L}+\s*)+$/.test(title);
+                                // 通过移除话题标签后是否为空来判断是否全为话题标签
+                                const withoutHashtags = title.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim();
+                                const isAllHashtags = withoutHashtags === '';
+
                                 if (isAllHashtags) {
                                     // 全是话题标签，将 # 转为空格
                                     title = title.replace(/#/g, ' ').replace(/\s+/g, ' ').trim();
                                 } else {
-                                    // 有实际内容，移除话题标签
-                                    title = title.replace(/#[^\s#]+/g, ' ').replace(/\s+/g, ' ').trim();
+                                    // 有实际内容，使用移除话题标签后的内容
+                                    title = withoutHashtags;
                                 }
 
-                                // 截取前80个字符
-                                if (title.length > 80) {
-                                    title = title.substring(0, 80) + '...';
+                                // 截取前20个字符
+                                if (title.length > 20) {
+                                    title = title.substring(0, 20) + '...';
                                 }
 
                                 console.log(`[抖音] 从 _ROUTER_DATA 提取 - 标题: ${title}, 作者: ${author}`);
