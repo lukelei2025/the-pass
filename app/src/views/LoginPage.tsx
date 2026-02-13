@@ -4,12 +4,14 @@ export default function LoginPage() {
     const { signIn } = useAuth();
 
     const handleSignIn = async () => {
-        console.log('[LoginPage] Login button clicked, signIn function:', typeof signIn);
+        console.log('[LoginPage-v2.0] Login button clicked');
+        console.log('[LoginPage-v2.0] Current time:', new Date().toISOString());
+        console.log('[LoginPage-v2.0] signIn function:', typeof signIn);
         try {
             await signIn();
-            console.log('[LoginPage] signIn call completed');
+            console.log('[LoginPage-v2.0] signIn call completed');
         } catch (error) {
-            console.error('[LoginPage] Sign in error:', error);
+            console.error('[LoginPage-v2.0] Sign in error:', error);
         }
     };
 
@@ -33,6 +35,8 @@ export default function LoginPage() {
                     onClick={handleSignIn}
                     className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-[var(--color-border)] rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 transition-all duration-200 group"
                 >
+                    {/* Version tag for debugging */}
+                    <span className="absolute top-2 right-2 text-[8px] text-gray-400">v2.0</span>
                     <svg width="20" height="20" viewBox="0 0 24 24">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
