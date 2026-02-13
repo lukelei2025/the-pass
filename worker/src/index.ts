@@ -12,6 +12,7 @@ import { GenericPlatform } from './platforms/generic';
 import { createCorsHeaders, createOptionsResponse } from './utils/cors';
 import { Env, TitleResult } from './platforms/base';
 import { CLASSIFICATION_RULES } from './classification-rules';
+import { USER_AGENTS } from './config/constants';
 
 // 平台处理器列表（按优先级排序）
 const PLATFORMS = [
@@ -26,6 +27,7 @@ export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
         const url = new URL(request.url);
         const targetUrl = url.searchParams.get('url');
+        const resolveOnly = url.searchParams.get('resolve') === '1';
 
         // 处理 OPTIONS 请求
         if (request.method === 'OPTIONS') {
@@ -43,6 +45,26 @@ export default {
                 status: 400,
                 headers: createCorsHeaders(),
             });
+        }
+
+        if (request.method === 'GET' && resolveOnly) {
+            const userAgent = targetUrl.includes('xhslink.com')
+                ? USER_AGENTS.XIAOHOUGSHU
+                : USER_AGENTS.GENERIC;
+            try {
+                const response = await fetch(targetUrl, {
+                    headers: { 'User-Agent': userAgent },
+                    redirect: 'follow',
+                } as any);
+                const resolvedUrl = response.url || targetUrl;
+                return new Response(JSON.stringify({ resolvedUrl }), {
+                    headers: createCorsHeaders(),
+                });
+            } catch (error: any) {
+                return new Response(JSON.stringify({ resolvedUrl: targetUrl, error: error.message }), {
+                    headers: createCorsHeaders(),
+                });
+            }
         }
 
         // 遍历平台处理器，返回第一个能处理的

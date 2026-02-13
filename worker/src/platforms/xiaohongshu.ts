@@ -48,8 +48,8 @@ export class XiaohongshuPlatform extends BasePlatform {
             }
         }
         const methods = [
-            () => this.fetchWithMetaTags(url),
             () => this.fetchWithJinaReader(url, env),
+            () => this.fetchWithMetaTags(url),
         ];
 
         for (const method of methods) {
@@ -131,6 +131,11 @@ export class XiaohongshuPlatform extends BasePlatform {
             let title = titleMatch ? decodeEntities(titleMatch[1]) : '';
             const description = descMatch ? decodeEntities(descMatch[1]) : '';
 
+            const trimmedTitle = title.trim();
+            if (!trimmedTitle || trimmedTitle.toLowerCase() === 'vlog' || trimmedTitle === '小红书') {
+                return { error: 'Generic title' };
+            }
+
             if (!title || title.toLowerCase() === 'vlog') {
                 if (description) {
                     title = description.length > 50 ? `${description.substring(0, 50)}...` : description;
@@ -142,6 +147,11 @@ export class XiaohongshuPlatform extends BasePlatform {
                 if (tagMatch) {
                     title = decodeEntities(tagMatch[1]).replace(/\s*-\s*小红书$/, '').trim();
                 }
+            }
+
+            const finalTitle = title.trim();
+            if (!finalTitle || finalTitle.toLowerCase() === 'vlog' || finalTitle === '小红书') {
+                return { error: 'Generic title' };
             }
 
             let author = '';
@@ -159,14 +169,7 @@ export class XiaohongshuPlatform extends BasePlatform {
                     jsonStr = jsonStr.replace(/undefined/g, 'null');
                     const data = JSON.parse(jsonStr);
 
-                    const noteIdMatch = html.match(/\"noteId\"\s*:\s*\"([a-f0-9]+)\"/i);
-                    const noteId = noteIdMatch?.[1];
-                    if (noteId && data?.note?.noteDetailMap?.[noteId]?.noteCard?.user) {
-                        const userData = data.note.noteDetailMap[noteId].noteCard.user;
-                        author = userData.nickname || userData.name || userData.username || '';
-                    }
-
-                    if (!author && data?.note?.noteDetailMap) {
+                    if (data?.note?.noteDetailMap) {
                         const keys = Object.keys(data.note.noteDetailMap);
                         if (keys.length > 0) {
                             const firstNote = data.note.noteDetailMap[keys[0]];
@@ -200,7 +203,7 @@ export class XiaohongshuPlatform extends BasePlatform {
             }
 
             return {
-                title,
+                title: finalTitle,
                 author,
                 description,
                 method: 'meta_tags',
