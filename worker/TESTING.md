@@ -50,6 +50,24 @@ vim .env.local
 # 填入你的 GLM_API_KEY
 ```
 
+---
+
+## 生产部署注意事项（避免覆盖 Dashboard Secrets）
+
+### 必须使用 --keep-vars
+
+Cloudflare Dashboard 中的 Secrets（例如 GLM_API_KEY、JINA_API_KEY）会在部署时被本地配置覆盖。
+为避免清空线上密钥，部署时必须带上：
+
+```bash
+npx wrangler deploy --keep-vars
+```
+
+### 推荐做法
+
+- Secrets 永远只在 Cloudflare Dashboard 或 `wrangler secret put` 中配置
+- 不要在 `wrangler.toml` 里写 `GLM_API_KEY` 或 `JINA_API_KEY`
+
 ### 3. 启动 Worker
 
 ```bash

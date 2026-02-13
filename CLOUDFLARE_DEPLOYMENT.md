@@ -62,7 +62,7 @@ EOF
 wrangler kv:namespace create "CACHE"
 
 # 6. 部署
-wrangler deploy
+wrangler deploy --keep-vars
 ```
 
 ---
