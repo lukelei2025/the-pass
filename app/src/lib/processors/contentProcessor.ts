@@ -43,7 +43,7 @@ const HASHTAG_PATTERN = /#[^\s]+/g;
 /**
  * URL 模式
  */
-const URL_PATTERN = /(https?:\/\/[^\s]+)/g;
+const URL_PATTERN = /(https?:\/\/[^\s]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
 
 /**
  * 从输入文本中提取 URL
@@ -53,7 +53,23 @@ const URL_PATTERN = /(https?:\/\/[^\s]+)/g;
  */
 export function extractUrl(input: string): string | null {
   const match = input.match(URL_PATTERN);
-  return match ? match[1] : null;
+  if (!match) {
+    return null;
+  }
+
+  return normalizeUrl(match[0]);
+}
+
+export function normalizeUrl(rawUrl: string): string {
+  let cleaned = rawUrl.trim();
+  cleaned = cleaned.replace(/^[\(\[\{<]+/, '');
+  cleaned = cleaned.replace(/[\)\]\}>.,!?;:]+$/, '');
+
+  if (!/^https?:\/\//i.test(cleaned)) {
+    return `https://${cleaned}`;
+  }
+
+  return cleaned;
 }
 
 /**

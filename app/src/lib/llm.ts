@@ -5,7 +5,7 @@
 
 import type { Category } from '../types';
 import { API_ENDPOINTS, buildWorkerUrl, REQUEST_TIMEOUT } from '../config/api';
-import { validateCategory } from './processors/contentProcessor';
+import { extractUrl, validateCategory } from './processors/contentProcessor';
 
 
 export interface LLMConfig {
@@ -188,8 +188,7 @@ export async function classifyContent(
     config: LLMConfig
 ): Promise<ClassificationResult> {
     // 1. 基础信息提取 (用于 UI 展示和 metadata)
-    const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
-    const extractedUrl = urlMatch ? urlMatch[1] : null;
+    const extractedUrl = extractUrl(content);
     const isLink = !!extractedUrl;
     let resolvedUrl = extractedUrl;
 
