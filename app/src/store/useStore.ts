@@ -39,6 +39,7 @@ interface StoreState {
   addItem: (item: Omit<Item, 'id' | 'createdAt' | 'expiresAt'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<Item>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
+  clearHistory: () => Promise<void>;
   getItemsByStatus: (status: ItemStatus) => Item[];
   getItemsByCategory: (category: Category) => Item[];
   getPendingItems: () => Item[];
@@ -187,6 +188,27 @@ export const useStore = create<StoreState>()(
           await itemsStore.removeItem(id);
           set((state) => ({
             items: state.items.filter((i) => i.id !== id),
+          }));
+        }
+      },
+
+      // 清空历史记录
+      clearHistory: async () => {
+        const { userId, items } = get();
+        const historyItems = items.filter(item =>
+          ['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)
+        );
+
+        if (historyItems.length === 0) return;
+
+        if (userId) {
+          await firestoreService.deleteItems(userId, historyItems.map(i => i.id));
+        } else {
+          for (const item of historyItems) {
+            await itemsStore.removeItem(item.id);
+          }
+          set((state) => ({
+            items: state.items.filter((i) => i.status === 'pending'),
           }));
         }
       },

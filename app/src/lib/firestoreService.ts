@@ -44,6 +44,29 @@ export async function deleteItem(userId: string, itemId: string): Promise<void> 
 }
 
 /**
+ * Delete multiple items in batches.
+ * Firestore allows max 500 operations per batch.
+ */
+export async function deleteItems(
+    userId: string,
+    itemIds: string[]
+): Promise<void> {
+    const batchSize = 450;
+    for (let i = 0; i < itemIds.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = itemIds.slice(i, i + batchSize);
+
+        for (const itemId of chunk) {
+            const docRef = getUserItemDoc(userId, itemId);
+            batch.delete(docRef);
+        }
+
+        await batch.commit();
+        console.log(`Deleted batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(itemIds.length / batchSize)}`);
+    }
+}
+
+/**
  * Subscribe to real-time item updates.
  * Returns an unsubscribe function.
  */

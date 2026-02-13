@@ -1,19 +1,54 @@
+import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { mapCategory } from '../lib/constants';
 import { useTranslation } from '../hooks/useTranslation';
 
 export default function HistoryView() {
-  const { items } = useStore();
+  const { items, clearHistory } = useStore();
   const { t } = useTranslation();
+  const [isClearing, setIsClearing] = useState(false);
+
   const processedItems = items.filter(item =>
     ['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)
   ).sort((a, b) => (b.processedAt || b.createdAt) - (a.processedAt || a.createdAt));
+
+  const handleClearHistory = async () => {
+    if (processedItems.length === 0) return;
+
+    const confirmed = window.confirm(
+      `确定要清空所有 ${processedItems.length} 条历史记录吗？此操作不可恢复。`
+    );
+    if (!confirmed) return;
+
+    setIsClearing(true);
+    try {
+      await clearHistory();
+    } catch (error) {
+      console.error('清空历史记录失败:', error);
+      alert('清空失败，请重试');
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
         <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.history.title}</h2>
-        <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{processedItems.length} records</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
+            {processedItems.length} {t.history.records}
+          </span>
+          {processedItems.length > 0 && (
+            <button
+              onClick={handleClearHistory}
+              disabled={isClearing}
+              className="px-3 py-1.5 text-[12px] font-medium text-[var(--color-red)] border border-[var(--color-red)] rounded-md hover:bg-[var(--color-red)] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isClearing ? '清空中...' : t.history.clearHistory}
+            </button>
+          )}
+        </div>
       </div>
 
       {processedItems.length === 0 ? (

@@ -87,6 +87,7 @@ export const en = {
         title: 'Traces',
         empty: 'No history yet.',
         clearHistory: 'Clear History',
+        records: 'records',
     },
     item: {
         linkMetadata: 'Link metadata identified',

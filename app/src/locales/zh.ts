@@ -89,6 +89,7 @@ export const zh: Locale = {
         title: '历史记录',
         empty: '暂无历史记录。',
         clearHistory: '清空历史',
+        records: '条记录',
     },
     item: {
         linkMetadata: '已识别链接元数据',
