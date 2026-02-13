@@ -4,10 +4,12 @@ export default function LoginPage() {
     const { signIn } = useAuth();
 
     const handleSignIn = async () => {
+        console.log('[LoginPage] Login button clicked, signIn function:', typeof signIn);
         try {
             await signIn();
+            console.log('[LoginPage] signIn call completed');
         } catch (error) {
-            console.error('Sign in error:', error);
+            console.error('[LoginPage] Sign in error:', error);
         }
     };
 
