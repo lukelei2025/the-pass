@@ -8,6 +8,8 @@ export interface TitleResult {
     title: string | null;
     author: string;
     cached?: boolean;
+    method?: string;
+    error?: string;
 }
 
 export interface Env {

@@ -6,14 +6,6 @@
 
 import { BasePlatform, TitleResult, Env } from './base';
 
-interface TweetData {
-    username?: string;
-    name?: string;
-    verified?: boolean;
-    created_at?: string;
-    public_metrics?: { tweet_count?: number };
-}
-
 export class TwitterPlatform extends BasePlatform {
     getName(): string {
         return 'twitter';
@@ -47,67 +39,67 @@ export class TwitterPlatform extends BasePlatform {
             }
         }
 
-        // 使用 Twitter API v2 获取推文
-        const bearerToken = env.TWITTER_BEARER_TOKEN;
-        if (!bearerToken) {
-            return { title: null, author: '' };
-        }
+        return await this.fetchWithJina(url, env);
+    }
 
+    private async fetchWithJina(url: string, env: Env): Promise<TitleResult> {
         try {
-            const apiUrl = `https://api.twitter.com/2/tweets/${tweetId}?expansions=author_id&user.fields=username,name,verified&tweet.fields=created_at,public_metrics`;
+            const cleanUrl = url.replace(/^https?:\/\//, '');
+            const apiUrl = `https://r.jina.ai/http://${cleanUrl}`;
+            const headers: Record<string, string> = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            };
+            if (env.JINA_API_KEY) {
+                headers['Authorization'] = `Bearer ${env.JINA_API_KEY}`;
+            }
 
             const response = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `Bearer ${bearerToken}`,
-                },
+                headers,
+                signal: AbortSignal.timeout(15000),
             } as any);
 
-            if (response.status === 401) {
-                return { title: null, author: '' };
-            }
-            if (response.status === 403) {
-                return { title: null, author: '' };
-            }
-            if (response.status === 404) {
-                return { title: null, author: '' };
-            }
-            if (response.status === 429) {
-                return { title: null, author: '' };
-            }
-            if (response.status !== 200) {
-                return { title: null, author: '' };
+            if (!response.ok) {
+                return { title: null, author: '', method: 'twitter_jina', error: `Jina HTTP ${response.status}` };
             }
 
-            const data = await response.json() as any;
-            const tweet = data.data as TweetData;
-            const user = data.includes?.users?.[0];
-
-            if (!user) {
-                return { title: null, author: '' };
+            const content = await response.text();
+            const { title, author } = this.parseJinaTweet(content);
+            if (!title && !author) {
+                return { title: null, author: '', method: 'twitter_jina', error: 'Jina parse failed' };
             }
 
-            // 写入缓存
-            if (cache) {
-                const cachedData = {
-                    username: user.username,
-                    author: user.username,
-                };
-                await cache.put(`tweet:${tweetId}`, JSON.stringify(cachedData), {
-                    expirationTtl: 3600,
-                });
-            }
-
-            return {
-                title: tweet.text || '',
-                author: user.username || '',
-                method: 'twitter_api_v2',
-            };
+            return { title: title || null, author: author || '', method: 'twitter_jina' };
         } catch (error: any) {
             if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-                return { title: null, author: '' };
+                return { title: null, author: '', method: 'twitter_jina', error: 'Jina timeout' };
             }
-            return { title: null, author: '' };
+            return { title: null, author: '', method: 'twitter_jina', error: 'Jina request failed' };
         }
+    }
+
+    private parseJinaTweet(content: string): { title: string | null; author: string | null } {
+        const titleLine = content.split('\n').find(line => line.startsWith('Title:')) || '';
+        if (titleLine) {
+            const raw = titleLine.replace(/^Title:\s*/, '').trim();
+            const match = raw.match(/^(.*?)\s+on X:\s+"([\s\S]*?)"\s*\/\s*X$/);
+            if (match) {
+                return { author: match[1].trim(), title: match[2].trim() };
+            }
+            const fallback = raw.replace(/\s*\/\s*X$/i, '').trim();
+            if (fallback) {
+                return { author: null, title: fallback };
+            }
+        }
+
+        const paragraphMatch = content.match(/\nMarkdown Content:\n([\s\S]+)/);
+        if (paragraphMatch?.[1]) {
+            const firstLine = paragraphMatch[1].split('\n').find(line => line.trim().length > 0);
+            if (firstLine) {
+                return { author: null, title: firstLine.trim() };
+            }
+        }
+
+        return { title: null, author: null };
     }
 
     /**
