@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useStore } from './store/useStore';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { useTranslation } from './hooks/useTranslation';
+import { useIsMobile } from './hooks/useMediaQuery';
 import WorkbenchView from './views/WorkbenchView';
 import MenuView from './views/MenuView';
 import FreezerView from './views/FreezerView';
@@ -13,16 +14,8 @@ import LoginPage from './views/LoginPage';
 function AppContent() {
   const { currentView, checkExpired, setCurrentView, initializeForUser } = useStore();
   const { user, loading, signOut } = useAuth();
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const { t } = useTranslation();
-
-  // Check mobile state
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Cleanup legacy local storage
   useEffect(() => {
@@ -36,6 +29,7 @@ function AppContent() {
     }
   }, [user, initializeForUser]);
 
+  // Check expired items periodically
   useEffect(() => {
     const interval = setInterval(checkExpired, 60000);
     return () => clearInterval(interval);
@@ -165,22 +159,19 @@ function AppContent() {
 
         {/* Mobile Right Side Floating Dock */}
         {isMobile && (
-          <nav className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 bg-white/80 backdrop-blur-xl border border-black/5 p-3 rounded-2xl shadow-lg">
+          <nav className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-0 bg-white/90 backdrop-blur-xl border-l border-t border-b border-black/5 rounded-l-2xl shadow-lg py-3 px-2">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id)}
-                className="flex flex-col items-center justify-center gap-1 w-10 h-10 relative group"
+                className={`flex flex-col items-center justify-center gap-1 w-12 h-14 relative transition-all duration-200 ${currentView === item.id ? 'bg-[rgba(0,0,0,0.04)]' : ''}`}
               >
-                <div className={`transition-all duration-200 ${currentView === item.id ? 'scale-110 text-[var(--color-accent)]' : 'text-[#999]'}`}>
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                    <path d={item.icon} />
-                  </svg>
-                </div>
-                {/* Optional: Tooltip or indicator if needed, but keeping it clean for now */}
-                {currentView === item.id && (
-                  <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-3 rounded-l-full bg-[var(--color-accent)] opacity-0" />
-                )}
+                <svg className={`w-6 h-6 transition-all duration-200 ${currentView === item.id ? 'text-[var(--color-accent)]' : 'text-[#999]'}`} viewBox="0 0 24 24" fill="currentColor">
+                  <path d={item.icon} />
+                </svg>
+                <span className={`text-[10px] font-medium whitespace-nowrap ${currentView === item.id ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-secondary)]'}`}>
+                  {item.label}
+                </span>
               </button>
             ))}
           </nav>

@@ -1,15 +1,15 @@
 /**
  * Vite Plugin: 服务端标题抓取代理
- * 
+ *
  * 解决浏览器 CORS 限制，通过 Vite 开发服务器的 Node.js 环境
- * 代理请求目标网页并提取标题信息。
- * 
+ * 代理请求目标网页并提取标题和作者信息。
+ *
  * 双 User-Agent 策略：
  *   1. 浏览器 UA (适用于微信公众号等传统网站)
  *   2. Googlebot UA (适用于飞书/Notion 等 SPA，它们对爬虫做 SSR)
- * 
+ *
  * 端点: GET /api/fetch-title?url=<encoded_url>
- * 返回: { title?: string, error?: string }
+ * 返回: { title?: string, author?: string, error?: string }
  */
 import type { Plugin } from 'vite';
 
@@ -42,6 +42,44 @@ function extractTitle(html: string): string | null {
         const clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
         if (clean) return decodeEntities(clean);
     }
+
+    return null;
+}
+
+/**
+ * 从 HTML 字符串中提取作者信息
+ */
+function extractAuthor(html: string, url: string): string | null {
+    // 1. twitter:creator (Twitter/X)
+    const twitterCreator = html.match(/<meta[^>]*name=["']twitter:creator["'][^>]*content=["']([^"']+)["']/i);
+    if (twitterCreator?.[1]) return twitterCreator[1].replace(/^@/, '');
+
+    // 2. og:article:author (文章作者)
+    const articleAuthor = html.match(/<meta[^>]*property=["']og:article:author["'][^>]*content=["']([^"']+)["']/i);
+    if (articleAuthor?.[1]) return articleAuthor[1];
+
+    // 3. author meta 标签
+    const authorMeta = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+    if (authorMeta?.[1]) return authorMeta[1];
+
+    // 4. 飞书文档作者
+    if (url.includes('feishu.cn') || url.includes('feishu.com')) {
+        // 飞书可能在 script 标签中存储作者信息
+        const scriptMatch = html.match(/window\.g_initialProps\s*=\s*({[^}]+})/);
+        if (scriptMatch) {
+            try {
+                const props = JSON.parse(scriptMatch[1]);
+                if (props?.doc?.author) return props.doc.author;
+                if (props?.author) return props.author;
+            } catch (e) {
+                // 忽略解析错误
+            }
+        }
+    }
+
+    // 5. 知乎作者
+    const zhihuAuthor = html.match(/<span class=["']AuthorInfo-name[^>]*>([^<]+)<\/span>/i);
+    if (zhihuAuthor?.[1]) return zhihuAuthor[1].trim();
 
     return null;
 }
@@ -140,9 +178,10 @@ export function fetchTitlePlugin(): Plugin {
 
                         const html = await response.text();
                         const title = extractTitle(html);
+                        const author = extractAuthor(html, targetUrl);
 
                         if (title) {
-                            res.end(JSON.stringify({ title }));
+                            res.end(JSON.stringify({ title, author }));
                             return;
                         }
                         // 没提取到标题，尝试下一个 UA
@@ -152,7 +191,7 @@ export function fetchTitlePlugin(): Plugin {
                 }
 
                 // 所有策略都失败
-                res.end(JSON.stringify({ title: null }));
+                res.end(JSON.stringify({ title: null, author: null }));
             });
         },
     };

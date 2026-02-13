@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { getRemainingTime, formatRemainingTime, mapCategory } from '../lib/constants';
 import { classifyContent } from '../lib/llm';
+import { processItemContent } from '../lib/processors/contentProcessor';
 import type { Category, ContentType } from '../types';
 import ItemCard from '../components/ItemCard';
 import { useTranslation } from '../hooks/useTranslation';
@@ -26,82 +27,26 @@ export default function WorkbenchView() {
     if (!inputText.trim()) return;
     setIsClassifying(true);
 
+    // 1. 调用 LLM 分类并获取元数据
     const { category, metadata } = await classifyContent(inputText, {
       enabled: settings.llmAutoClassify,
     });
 
+    // 2. 处理内容（分离标题和用户笔记）
+    const processed = processItemContent(inputText, metadata);
+
+    // 3. 确定内容类型
     const type: ContentType = metadata.isLink ? 'link' : 'text';
 
-    // 修正：分离 Title 和 Content (User Note)
-    let title: string | undefined = undefined;
-    let finalContent = inputText;
-
-    if (metadata.isLink) {
-      if (metadata.title) {
-        title = metadata.title; // 链接标题存入 title
-      }
-
-      // 提取用户在 URL 之外写的文字作为 Note
-      let userText = inputText
-        .replace(/(https?:\/\/[^\s]+)/g, '')  // 去掉链接
-        .replace(/复制后打开.*$/s, '')         // 去掉平台噪音
-        .replace(/复制此链接.*$/s, '')
-        .replace(/打开.*查看.*$/s, '')
-        .replace(/#[^\s]+/g, '')              // 去掉 hashtags
-        .trim();
-
-      // 如果有用户写的文字，存为 content；否则 content 为空字符串或保留原始输入（这里选择存空，让 content 纯粹为笔记）
-      // 实际上，为了兼容性，如果 content 为空但有 title，列表显示 title。
-      // 但为了 edit 方便，content 应该是用户的 note。
-
-      if (userText) {
-        // Dedup: Check if userText is just a copy of the title (common in share text)
-        const normalize = (str: string) => str.replace(/[\s\p{P}]+/gu, '').toLowerCase();
-
-        const cleanUserText = normalize(userText);
-        const cleanTitle = title ? normalize(title) : '';
-
-        // Strategy: If the note is contained in the title, or the title is contained in the note,
-        // AND the user didn't explicitly write something different (heuristic), discard it.
-        // For Xiaohongshu specifically, share text often equals title.
-        const isDuplicate = cleanTitle && (cleanUserText.includes(cleanTitle) || cleanTitle.includes(cleanUserText));
-
-        // Special Case: Xiaohongshu often includes long intro text in clipboard share.
-        // User explicitly requested to hide this "gray introduction text".
-        const isXiaohongshu = metadata.platform === '小红书';
-
-        if (isXiaohongshu) {
-          finalContent = ''; // Aggressively clear for Xiaohongshu to avoid clutter
-        } else if (!isDuplicate) {
-          finalContent = userText;
-        } else {
-          finalContent = ''; // Filter out redundant text
-        }
-      } else {
-        // If no user note, Content is empty
-        finalContent = '';
-      }
-    } else {
-      // 纯文本：Title 也就是 Content 的一部分？或者 Title 为空
-      // 纯文本通常没有 Title，内容就是 Content
-      title = undefined;
-      finalContent = inputText;
-    }
-
-    // Fallback: 如果是链接但没抓取到 title， content 应该是 inputText 还是 url?
-    if (metadata.isLink && !title) {
-      // 没抓到标题，content 也就是原始输入（包含 URL）
-      finalContent = inputText;
-    }
-
+    // 4. 添加到数据库
     await addItem({
-      content: finalContent,
+      content: processed.content,
       type,
       category,
       source: metadata.isLink ? (metadata.source || metadata.content) : undefined,
       originalUrl: metadata.isLink ? (metadata.originalUrl || metadata.content) : undefined,
       status: 'pending',
-      title,
+      title: processed.title,
     });
 
     setInputText('');
