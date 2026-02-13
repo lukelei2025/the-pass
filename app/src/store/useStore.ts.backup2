@@ -1,0 +1,212 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import localforage from 'localforage';
+import type { Item, Settings, Category, ItemStatus } from '../types';
+import * as firestoreService from '../lib/firestoreService';
+import { enableOfflinePersistence } from '../lib/firebase';
+
+// 初始化 localForage (kept for migration and offline fallback)
+const itemsStore = localforage.createInstance({
+  name: 'digital-workbench',
+  storeName: 'items',
+});
+
+const settingsStore = localforage.createInstance({
+  name: 'digital-workbench',
+  storeName: 'settings',
+});
+
+// 默认设置 (不包含 llmApiKey, 它存在 localStorage)
+const defaultSettings: Settings = {
+  expireHours: 24,
+  clearanceTime: '22:00',
+  theme: 'light',
+  enableReminders: true,
+  clearanceEnabled: false,
+  llmAutoClassify: true,
+};
+
+// 生成唯一 ID
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// 计算过期时间
+function calculateExpireTime(hours: 24 | 48): number {
+  return Date.now() + hours * 60 * 60 * 1000;
+}
+
+export const useStore = create<StoreState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      settings: defaultSettings,
+      currentView: 'workbench' as const,
+
+      // Items 操作
+      getItemsByStatus: (status: ItemStatus) => {
+        return get().items.filter(item => item.status === status);
+      },
+
+      addItem: async (itemData) => {
+        const newItem: Item = {
+          ...itemData,
+          id: generateId(),
+          createdAt: Date.now(),
+          expiresAt: calculateExpireTime(get().settings.expireHours),
+        };
+
+        // 立即更新本地状态，让用户能立即看到
+        set((state) => ({
+          items: [...state.items, newItem],
+        }));
+
+        // 后台同步到 Firestore（不阻塞）
+        const { userId } = get();
+        if (userId) {
+          firestoreService.addItem(userId, newItem).catch(error => {
+            console.error('[addItem] Firestore 同步失败:', error);
+          });
+        } else {
+          itemsStore.setItem(newItem.id, newItem).catch(error => {
+            console.error('[addItem] LocalStorage 写入失败:', error);
+          });
+        }
+      },
+
+      updateItem: async (id, updates) => {
+        const { userId } = get();
+
+        if (userId) {
+          await firestoreService.updateItem(userId, id, updates);
+        } else {
+          const item = get().items.find((i) => i.id === id);
+          if (!item) return;
+          const updatedItem = { ...item, ...updates };
+          await itemsStore.setItem(id, updatedItem);
+          set((state) => ({
+            items: state.items.map((i) => (i.id === id ? updatedItem : i)),
+          }));
+        }
+      },
+
+      deleteItem: async (id) => {
+        const { userId } = get();
+
+        if (userId) {
+          await firestoreService.deleteItem(userId, id);
+        } else {
+          await itemsStore.removeItem(id);
+          set((state) => ({
+            items: state.items.filter((i) => i.id !== id),
+          }));
+        }
+      },
+
+      clearHistory: async () => {
+        const { userId, items } = get();
+        const historyItems = items.filter(item =>
+          ['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)
+        );
+
+        if (userId) {
+          const idsToDelete = historyItems.map(item => item.id);
+          for (const id of idsToDelete) {
+            await firestoreService.deleteItem(userId, id);
+          }
+        } else {
+          for (const item of historyItems) {
+            await itemsStore.removeItem(item.id);
+          }
+        }
+
+        set((state) => ({
+          items: state.items.filter(item => item.status === 'pending'),
+        }));
+      },
+
+      getItemsByStatus: (status: ItemStatus) => {
+        return get().items.filter(item => item.status === status);
+      },
+
+      getItemsByCategory: (category: Category) => {
+        return get().items.filter(item => item.category === category);
+      },
+
+      exportData: async () => {
+        const { items, settings } = get();
+        const exportData = {
+          version: '1.0',
+          exportDate: new Date().toISOString(),
+          items,
+          settings,
+        };
+        return JSON.stringify(exportData, null, 2);
+      },
+
+      importData: async (jsonData) => {
+        try {
+          const data = JSON.parse(jsonData);
+          if (!data.items || !Array.isArray(data.items)) {
+            throw new Error('Invalid data format');
+          }
+
+          const { userId } = get();
+
+          if (userId) {
+            // Import to Firestore
+            for (const item of data.items as Item[]) {
+              await firestoreService.addItem(userId, item);
+            }
+          } else {
+            // Import to localForage
+            for (const item of data.items as Item[]) {
+              await itemsStore.setItem(item.id, item);
+            }
+          }
+
+          if (data.settings) {
+            set({ settings: data.settings });
+          }
+
+          set({ items: data.items as Item[] });
+        } catch (error) {
+          throw new Error('导入失败：数据格式不正确');
+        }
+      },
+
+      // Settings 操作
+      updateSettings: (updates: Partial<Settings>) => {
+        set((state) => ({
+          settings: { ...state.settings, ...updates },
+        }));
+      },
+
+      // 认证检查
+      checkExpired: async () => {
+        const now = Date.now();
+        const pendingItems = get().items.filter(item => item.status === 'pending');
+        let hasExpired = false;
+
+        for (const item of pendingItems) {
+          if (item.expiresAt <= now) {
+            await get().updateItem(item.id, { status: 'expired' });
+            hasExpired = true;
+          }
+        }
+
+        return hasExpired;
+      },
+
+      // Auth state
+      setUserId: (userId) => {
+        set({ userId });
+      },
+
+      // 视图切换
+      setCurrentView: (view) => {
+        set({ currentView: view });
+      },
+    })
+  );
+}
