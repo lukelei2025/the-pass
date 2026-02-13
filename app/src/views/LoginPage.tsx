@@ -4,15 +4,20 @@ export default function LoginPage() {
     const { signIn } = useAuth();
 
     const handleSignIn = async () => {
+        console.log('[LoginPage-v2.0] ========== START ==========');
         console.log('[LoginPage-v2.0] Login button clicked');
         console.log('[LoginPage-v2.0] Current time:', new Date().toISOString());
         console.log('[LoginPage-v2.0] signIn function:', typeof signIn);
+        console.log('[LoginPage-v2.0] Window location:', window.location.href);
+        console.log('[LoginPage-v2.0] User agent:', navigator.userAgent);
         try {
+            console.log('[LoginPage-v2.0] About to call signIn...');
             await signIn();
             console.log('[LoginPage-v2.0] signIn call completed');
         } catch (error) {
             console.error('[LoginPage-v2.0] Sign in error:', error);
         }
+        console.log('[LoginPage-v2.0] ========== END ==========');
     };
 
     return (
@@ -32,7 +37,10 @@ export default function LoginPage() {
 
                 {/* Sign In Button */}
                 <button
-                    onClick={handleSignIn}
+                    onClick={() => {
+                        console.log('[LoginPage] Button onClick fired!');
+                        handleSignIn();
+                    }}
                     className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-[var(--color-border)] rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 transition-all duration-200 group"
                 >
                     {/* Version tag for debugging */}
