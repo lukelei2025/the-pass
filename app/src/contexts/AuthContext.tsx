@@ -32,6 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             await signInWithPopup(auth, googleProvider);
         } catch (error) {
+            // auth/cancelled-popup-request 表示用户取消了登录，不是真正的错误
+            if (error instanceof Error && 'code' in error && error.code === 'auth/cancelled-popup-request') {
+                console.log('[Auth] Login cancelled by user');
+                return;
+            }
             console.error('Login failed:', error);
             throw error;
         }

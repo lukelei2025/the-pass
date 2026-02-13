@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -21,8 +21,20 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Firestore with offline persistence using new API
 // 使用 persistentLocalCache 替代已弃用的 enableIndexedDbPersistence
-export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({})
-});
+let db: Firestore;
+
+try {
+    db = initializeFirestore(app, {
+        localCache: persistentLocalCache({})
+    });
+    console.log('[Firebase] ✅ Firestore initialized with persistentLocalCache');
+} catch (error) {
+    console.error('[Firebase] ❌ Failed to initialize Firestore with persistentLocalCache:', error);
+    console.warn('[Firebase] ⚠️ Falling back to default Firestore configuration');
+    // 降级到默认配置
+    db = initializeFirestore(app, {});
+}
+
+export { db };
 
 export default app;
