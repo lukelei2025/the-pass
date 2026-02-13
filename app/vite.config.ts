@@ -45,7 +45,7 @@ export default defineConfig({
         ],
 
         // ✅ 添加 Service Worker 导航配置
-        navigateFallback: false,  // 禁用 fallback 导航
+        navigateFallback: null,  // 禁用 fallback 导航
         navigationPreload: true,  // 启用预加载
       },
       manifest: {
@@ -68,6 +68,6 @@ export default defineConfig({
           }
         ]
       }
-    }
+    })
   ]
 })

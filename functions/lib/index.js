@@ -29,9 +29,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.classifyContent = void 0;
 const functions = __importStar(require("firebase-functions"));
 const axios_1 = __importDefault(require("axios"));
-const cors = __importStar(require("cors"));
+const cors_1 = __importDefault(require("cors"));
 // Initialize CORS middleware
-const corsHandler = cors({ origin: true });
+const corsHandler = (0, cors_1.default)({ origin: true });
 // GLM-4 API URL
 const GLM_API_URL = 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions';
 exports.classifyContent = functions.https.onRequest(async (req, res) => {

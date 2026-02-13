@@ -1,7 +1,7 @@
 
 import * as functions from 'firebase-functions';
 import axios from 'axios';
-import * as cors from 'cors';
+import cors from 'cors';
 
 // Initialize CORS middleware
 const corsHandler = cors({ origin: true });
