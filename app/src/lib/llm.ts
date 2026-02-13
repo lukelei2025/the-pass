@@ -73,12 +73,7 @@ export function identifyPlatform(url: string): { name: string; category: Categor
  * 统一返回格式：标题 #作者（优先）/平台（兜底）
  */
 async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default): Promise<string | null> {
-    // 识别平台
-    const platform = identifyPlatform(url);
-    const platformName = platform?.name;
-
     const isWeChat = url.includes('mp.weixin.qq.com');
-    const isXiaohongshu = url.includes('xiaohongshu.com') || url.includes('xhslink.com');
 
     // 策略 0: 如果是微信公众号，优先使用专用 Worker (抗反爬)
     if (isWeChat) {

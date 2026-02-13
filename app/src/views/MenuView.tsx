@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { getRemainingTime, formatRemainingTime, mapCategory } from '../lib/constants';
-import type { Category } from '../types';
+import { getRemainingTime, formatRemainingTime } from '../lib/constants';
 import ItemCard from '../components/ItemCard';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFilters } from '../hooks/useFilters';

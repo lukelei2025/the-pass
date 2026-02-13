@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { mapCategory } from '../lib/constants';
-import type { Category } from '../types';
 import ListItem from '../components/ListItem';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFilters } from '../hooks/useFilters';

@@ -1,4 +1,4 @@
-import type { Category, ContentType } from '../types';
+import type { Category, ContentType } from '../../types';
 
 /**
  * 内容处理结果

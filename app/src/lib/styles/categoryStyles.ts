@@ -1,4 +1,4 @@
-import type { Category } from '../types';
+import type { Category } from '../../types';
 
 /**
  * 分类颜色配置
@@ -44,7 +44,7 @@ export const CATEGORY_COLORS = {
  * @returns Tailwind CSS 类名字符串
  */
 export function getCategoryTagStyle(category: Category): string {
-  const colors = CATEGORY_COLORS[category];
+  const colors = CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS];
   return `bg-[${colors.bg}] text-[${colors.color}]`;
 }
 
@@ -60,7 +60,7 @@ export function getCategoryPillStyle(category: Category, selected: boolean): str
     return 'bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)] hover:bg-[rgba(0,0,0,0.08)]';
   }
 
-  const colors = CATEGORY_COLORS[category];
+  const colors = CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS];
   return `bg-[${colors.bg}] text-[${colors.color}] ring-1 ${colors.ring}`;
 }
 
@@ -71,7 +71,7 @@ export function getCategoryPillStyle(category: Category, selected: boolean): str
  * @returns CSS 类名
  */
 export function getCategoryDotClass(category: Category): string {
-  return CATEGORY_COLORS[category].dot;
+  return CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS].dot;
 }
 
 /**
