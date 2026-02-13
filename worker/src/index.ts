@@ -8,6 +8,7 @@ import { WeChatPlatform } from './platforms/wechat';
 import { TwitterPlatform } from './platforms/twitter';
 import { XiaohongshuPlatform } from './platforms/xiaohongshu';
 import { DouyinPlatform } from './platforms/douyin';
+import { FeishuPlatform } from './platforms/feishu';
 import { GenericPlatform } from './platforms/generic';
 import { createCorsHeaders, createOptionsResponse } from './utils/cors';
 import { Env, TitleResult } from './platforms/base';
@@ -20,6 +21,7 @@ const PLATFORMS = [
     new TwitterPlatform(),
     new XiaohongshuPlatform(),
     new DouyinPlatform(),
+    new FeishuPlatform(),
     new GenericPlatform(), // 兜底
 ];
 
@@ -28,6 +30,7 @@ export default {
         const url = new URL(request.url);
         const targetUrl = url.searchParams.get('url');
         const resolveOnly = url.searchParams.get('resolve') === '1';
+        const debug = url.searchParams.get('debug') === '1';
 
         // 处理 OPTIONS 请求
         if (request.method === 'OPTIONS') {
@@ -71,9 +74,11 @@ export default {
         for (const platform of PLATFORMS) {
             if (platform.canHandle(targetUrl)) {
                 const result = await platform.fetchTitle(targetUrl, env);
-                const response = result.title
+                const response = debug
                     ? JSON.stringify(result)
-                    : JSON.stringify({ title: null, author: null });
+                    : (result.title
+                        ? JSON.stringify(result)
+                        : JSON.stringify({ title: null, author: null }));
                 return new Response(response, {
                     headers: {
                         ...createCorsHeaders(),
