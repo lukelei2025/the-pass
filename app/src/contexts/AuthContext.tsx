@@ -3,6 +3,7 @@ import {
     onAuthStateChanged,
     signInWithPopup,
     signInWithRedirect,
+    getRedirectResult,
     signOut as firebaseSignOut,
     type User
 } from 'firebase/auth';
@@ -13,9 +14,10 @@ import { auth, googleProvider } from '../lib/firebase';
  * PWA 模式下弹窗可能被阻止，需要使用重定向登录
  */
 function isPWAMode(): boolean {
-    return window.matchMedia('(display-mode: standalone)').matches ||
-           // @ts-expect-no - iOS Safari specific property
-           (window.navigator as { standalone?: boolean }).standalone === true;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = (window.navigator as { standalone?: boolean }).standalone === true;
+    console.log('[Auth] Check PWA Mode:', { isStandalone, isIOSStandalone });
+    return isStandalone || isIOSStandalone;
 }
 
 interface AuthContextType {
@@ -32,7 +34,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // 检查重定向登录的结果 (处理 signInWithRedirect 返回的情况)
+        getRedirectResult(auth).then((result) => {
+            if (result) {
+                console.log('[Auth] Redirect login success:', result.user.uid);
+            }
+        }).catch((error) => {
+            console.error('[Auth] Redirect login error:', error);
+        });
+
         const unsubscribe = onAuthStateChanged(auth, (user) => {
+            console.log('[Auth] Auth state changed:', user ? 'Logged In' : 'Logged Out');
             setUser(user);
             setLoading(false);
         });
@@ -41,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signIn = async () => {
         try {
+            console.log('[Auth] Attempting sign in...');
             // PWA 模式下使用重定向登录，避免弹窗被阻止
             if (isPWAMode()) {
                 console.log('[Auth] PWA mode detected, using redirect sign-in');
