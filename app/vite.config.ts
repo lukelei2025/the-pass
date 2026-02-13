@@ -11,6 +11,29 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      workbox: {
+        // 强制立即激活新的 Service Worker
+        skipWaiting: true,
+        // 立即控制所有客户端
+        clientsClaim: true,
+        // 每次访问都检查更新（更频繁）
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/the-pass-45baf\.web\.app\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'the-pass-cache',
+              expiration: {
+                maxEntries: 64,
+                maxAgeSeconds: 24 * 60 * 60 // 24 hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
+      },
       manifest: {
         name: 'The Pass',
         short_name: 'The Pass',
