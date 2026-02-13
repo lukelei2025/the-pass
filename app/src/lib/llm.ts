@@ -22,6 +22,14 @@ export interface ContentMetadata {
     isLink: boolean;
 }
 
+export interface ClassificationResult {
+    category: Category;
+    metadata: ContentMetadata;
+    success: boolean;  // true = AI分类成功, false = 需要手动分类
+    offline?: boolean;  // 是否离线（网络原因）
+    disabled?: boolean;  // 是否用户主动关闭智能分类
+}
+
 /**
  * 已知平台识别
  */
@@ -154,7 +162,7 @@ function cleanPlatformTitle(title: string, url: string): string {
 export async function classifyContent(
     content: string,
     config: LLMConfig
-): Promise<{ category: Category; metadata: ContentMetadata }> {
+): Promise<ClassificationResult> {
     // 1. 基础信息提取 (用于 UI 展示和 metadata)
     const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
     const extractedUrl = urlMatch ? urlMatch[1] : null;
@@ -187,10 +195,10 @@ export async function classifyContent(
         if (isLink && metadata.platform) {
             const platformInfo = Object.values(PLATFORM_PATTERNS).find(p => p.name === metadata.platform);
             if (platformInfo) {
-                return { category: platformInfo.category, metadata };
+                return { category: platformInfo.category, metadata, success: false, disabled: true };
             }
         }
-        return { category: isLink ? 'external' : 'others', metadata };
+        return { category: isLink ? 'external' : 'others', metadata, success: false, disabled: true };
     }
 
     // 4. 调用 Cloudflare Worker (Classify)
@@ -208,21 +216,23 @@ export async function classifyContent(
 
         if (!response.ok) {
             console.error('Worker Classify Failed:', response.status);
-            return { category: isLink ? 'external' : 'others', metadata };
+            return { category: isLink ? 'external' : 'others', metadata, success: false, offline: response.status === 0 || !navigator.onLine };
         }
 
         const data = await response.json() as any;
         console.log('[Worker Classify Result]:', data);
 
         if (data && data.category) {
-            return { category: validateCategory(data.category), metadata };
+            return { category: validateCategory(data.category), metadata, success: true };
         }
 
-        return { category: isLink ? 'external' : 'others', metadata };
+        return { category: isLink ? 'external' : 'others', metadata, success: false };
 
     } catch (error) {
         console.error('Worker Call Failed:', error);
-        return { category: isLink ? 'external' : 'others', metadata };
+        // 检查是否是网络错误（离线）
+        const isOffline = error instanceof TypeError && error.message.includes('fetch');
+        return { category: isLink ? 'external' : 'others', metadata, success: false, offline: isOffline };
     }
 }
 

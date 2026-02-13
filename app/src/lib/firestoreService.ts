@@ -18,11 +18,10 @@ import type { Item, Settings } from '../types';
  * Firestore does not accept `undefined` values.
  * Strip them before writing.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function stripUndefined(obj: any): any {
+function stripUndefined<T extends object>(obj: T): T {
     return Object.fromEntries(
         Object.entries(obj).filter(([, v]) => v !== undefined)
-    );
+    ) as T;
 }
 
 const getUserItemsCollection = (userId: string) =>

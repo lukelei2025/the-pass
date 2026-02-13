@@ -5,12 +5,24 @@ import { classifyContent } from '../lib/llm';
 import { processItemContent } from '../lib/processors/contentProcessor';
 import type { Category, ContentType } from '../types';
 import ItemCard from '../components/ItemCard';
+import CategorySelector from '../components/ui/CategorySelector';
 import { useTranslation } from '../hooks/useTranslation';
+
+interface PendingItem {
+  content: string;
+  type: ContentType;
+  source?: string;
+  originalUrl?: string;
+  title?: string;
+}
 
 export default function WorkbenchView() {
   const { items, addItem, settings } = useStore();
   const [inputText, setInputText] = useState('');
   const [isClassifying, setIsClassifying] = useState(false);
+  const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [classificationReason, setClassificationReason] = useState<'offline' | 'disabled' | 'failed' | null>(null);
   const { t } = useTranslation();
 
   const pendingItems = items.filter(item => item.status === 'pending');
@@ -27,24 +39,49 @@ export default function WorkbenchView() {
     if (!inputText.trim()) return;
     setIsClassifying(true);
 
+    const llmEnabled = settings.llmAutoClassify;
+
     // 1. 调用 LLM 分类并获取元数据
-    const { category, metadata } = await classifyContent(inputText, {
-      enabled: settings.llmAutoClassify,
+    const result = await classifyContent(inputText, {
+      enabled: llmEnabled,
     });
 
     // 2. 处理内容（分离标题和用户笔记）
-    const processed = processItemContent(inputText, metadata);
+    const processed = processItemContent(inputText, result.metadata);
 
     // 3. 确定内容类型
-    const type: ContentType = metadata.isLink ? 'link' : 'text';
+    const type: ContentType = result.metadata.isLink ? 'link' : 'text';
 
-    // 4. 添加到数据库
+    // 4. 检查是否需要手动分类
+    if (!result.success) {
+      // 保存待处理数据，显示分类选择器
+      setPendingItem({
+        content: processed.content,
+        type,
+        source: result.metadata.isLink ? (result.metadata.source || result.metadata.content) : undefined,
+        originalUrl: result.metadata.isLink ? (result.metadata.originalUrl || result.metadata.content) : undefined,
+        title: processed.title,
+      });
+      // 区分原因：离线 > 用户关闭 > AI失败
+      if (result.offline) {
+        setClassificationReason('offline');
+      } else if (result.disabled) {
+        setClassificationReason('disabled');
+      } else {
+        setClassificationReason('failed');
+      }
+      setShowCategorySelector(true);
+      setIsClassifying(false);
+      return;
+    }
+
+    // 5. 直接添加（分类成功）
     await addItem({
       content: processed.content,
       type,
-      category,
-      source: metadata.isLink ? (metadata.source || metadata.content) : undefined,
-      originalUrl: metadata.isLink ? (metadata.originalUrl || metadata.content) : undefined,
+      category: result.category,
+      source: result.metadata.isLink ? (result.metadata.source || result.metadata.content) : undefined,
+      originalUrl: result.metadata.isLink ? (result.metadata.originalUrl || result.metadata.content) : undefined,
       status: 'pending',
       title: processed.title,
     });
@@ -53,8 +90,37 @@ export default function WorkbenchView() {
     setIsClassifying(false);
   };
 
+  const handleCategorySelect = (category: Category) => {
+    if (!pendingItem) return;
+
+    console.log('[CategorySelect] 开始添加，分类:', category, '待处理数据:', pendingItem);
+
+    // 不再等待 addItem 完成（状态会立即更新）
+    addItem({
+      ...pendingItem,
+      category,
+      status: 'pending',
+    });
+
+    console.log('[CategorySelect] addItem 调用完成，立即关闭窗口');
+
+    // 立即关闭窗口
+    setPendingItem(null);
+    setShowCategorySelector(false);
+    setIsClassifying(false);
+    setInputText('');
+  };
+
+  const handleCategoryCancel = () => {
+    setPendingItem(null);
+    setShowCategorySelector(false);
+    setClassificationReason(null);
+    setIsClassifying(false);
+  };
+
   const pendingCount = pendingItems.length;
   const llmConfigured = settings.llmAutoClassify;
+  const isOffline = !navigator.onLine;
 
   return (
     <div className="space-y-8 pb-20">
@@ -75,9 +141,13 @@ export default function WorkbenchView() {
           }}
         />
         <div className="flex justify-between items-center px-1">
-          <div className={`flex items-center gap-1.5 text-[11px] font-medium transition-colors ${llmConfigured ? 'text-[var(--color-green)]' : 'text-[var(--color-ink-tertiary)]'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${llmConfigured ? 'bg-[var(--color-green)]' : 'bg-[var(--color-ink-tertiary)]'}`} />
-            {isClassifying ? t.workbench.classifying : (llmConfigured ? t.workbench.autoClassifyOn : t.workbench.autoClassifyOff)}
+          <div className={`flex items-center gap-1.5 text-[11px] font-medium transition-colors ${isOffline ? 'text-orange-500' : (llmConfigured ? 'text-[var(--color-green)]' : 'text-[var(--color-ink-tertiary)]')}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-orange-500' : (llmConfigured ? 'bg-[var(--color-green)]' : 'bg-[var(--color-ink-tertiary)]')}`} />
+            {isClassifying ? t.workbench.classifying : (
+              isOffline
+                ? '离线模式'
+                : (llmConfigured ? t.workbench.autoClassifyOn : t.workbench.autoClassifyOff)
+            )}
           </div>
           <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)]">
             {pendingCount} {t.workbench.pending}
@@ -133,6 +203,26 @@ export default function WorkbenchView() {
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
       </div>
+
+      {/* Category Selector Modal */}
+      {showCategorySelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-[var(--color-surface)] rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-[17px] font-semibold text-[var(--color-ink)] mb-4">
+              {classificationReason === 'offline'
+                ? t.categorySelect.offline  // 离线模式
+                : classificationReason === 'disabled'
+                ? t.categorySelect.llmFailed  // 智能分类已关闭
+                : t.categorySelect.llmFailed  // AI分类失败
+              }
+            </h2>
+            <CategorySelector
+              onSelect={handleCategorySelect}
+              onCancel={handleCategoryCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

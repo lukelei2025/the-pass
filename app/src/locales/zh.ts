@@ -101,4 +101,13 @@ export const zh: Locale = {
         copyNotion: '复制 Notion',
         editNote: '编辑笔记',
     },
+
+    // Category Selector
+    categorySelect: {
+        prompt: '请选择分类',
+        cancel: '取消',
+        llmFailed: '智能分类已关闭，请手动选择',
+        offline: '离线模式，请手动选择',
+        changeCategory: '更改分类',
+    },
 };

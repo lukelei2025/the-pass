@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -19,11 +19,10 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Firestore
-export const db = getFirestore(app);
-
-// Functions
-// Functions (Not used - migrated to Cloudflare)
-// export const functions = getFunctions(app);
+// Firestore with offline persistence using new API
+// 使用 persistentLocalCache 替代已弃用的 enableIndexedDbPersistence
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({})
+});
 
 export default app;

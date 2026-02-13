@@ -99,6 +99,15 @@ export const en = {
         copyNotion: 'Copy Notion',
         editNote: 'Edit Note',
     },
+
+    // Category Selector
+    categorySelect: {
+        prompt: 'Select a category',
+        cancel: 'Cancel',
+        llmFailed: 'Auto-classification disabled, please select manually',
+        offline: 'Offline mode, please select manually',
+        changeCategory: 'Change category',
+    },
 };
 
 export type Locale = typeof en;

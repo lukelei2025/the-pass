@@ -92,7 +92,9 @@ export const useStore = create<StoreState>()(
 
       // Initialize store for a logged-in user
       initializeForUser: async (userId) => {
-        // 1. Migrate local data if needed
+        // 注释：离线持久化已在 firebase.ts 中通过 persistentLocalCache 启用
+        // 无需手动调用 enableOfflinePersistence
+
         if (!get().migrationDone) {
           try {
             // Read all local items
