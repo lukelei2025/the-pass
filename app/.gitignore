@@ -10,7 +10,17 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# 🔒 Environment variables (SECURITY: Never commit API keys)
+.env
+.env.local
+.env.production
+.env.development
 *.local
+
+# Firebase service account keys (if any)
+firebase-service-account.json
+*firebase-credentials.json
 
 # Editor directories and files
 .vscode/*

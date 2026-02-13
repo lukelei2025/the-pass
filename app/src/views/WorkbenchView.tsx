@@ -36,12 +36,21 @@ export default function WorkbenchView() {
   });
 
   const handleAddItem = async () => {
+    // 输入验证：检查空值
     if (!inputText.trim()) return;
+
+    // 输入验证：限制最大长度（防止性能问题和攻击）
+    const MAX_INPUT_LENGTH = 5000;
+    if (inputText.length > MAX_INPUT_LENGTH) {
+      console.warn(`[WorkbenchView] 输入过长：${inputText.length} / ${MAX_INPUT_LENGTH}`);
+      return;
+    }
+
     setIsClassifying(true);
 
     const llmEnabled = settings.llmAutoClassify;
 
-    // 1. 调用 LLM 分类并获取元数据
+    // 1. 调用 LLM 分类并获取元数据（使用原始输入，保持 LLM 分类准确性）
     const result = await classifyContent(inputText, {
       enabled: llmEnabled,
     });
@@ -52,11 +61,25 @@ export default function WorkbenchView() {
     // 3. 确定内容类型
     const type: ContentType = result.metadata.isLink ? 'link' : 'text';
 
-    // 4. 检查是否需要手动分类
+    // 4. XSS 防护：在存储前清理内容
+    const sanitizeInput = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+        .replace(/`/g, '&grave;')
+        .trim();
+    };
+
+    const sanitizedContent = sanitizeInput(processed.content);
+
+    // 5. 检查是否需要手动分类
     if (!result.success) {
       // 保存待处理数据，显示分类选择器
       setPendingItem({
-        content: processed.content,
+        content: sanitizedContent,
         type,
         source: result.metadata.isLink ? (result.metadata.source || result.metadata.content) : undefined,
         originalUrl: result.metadata.isLink ? (result.metadata.originalUrl || result.metadata.content) : undefined,
@@ -75,9 +98,9 @@ export default function WorkbenchView() {
       return;
     }
 
-    // 5. 直接添加（分类成功）
+    // 6. 直接添加（分类成功）- 使用清理后的内容
     await addItem({
-      content: processed.content,
+      content: sanitizedContent,
       type,
       category: result.category,
       source: result.metadata.isLink ? (result.metadata.source || result.metadata.content) : undefined,
