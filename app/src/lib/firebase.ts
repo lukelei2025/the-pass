@@ -4,7 +4,7 @@ import { initializeFirestore, persistentLocalCache, type Firestore } from 'fireb
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: "the-pass-45baf.web.app",  // 使用 Firebase Hosting 的新域名
+    authDomain: "the-pass-45baf.firebaseapp.com",
     projectId: "the-pass-45baf",
     storageBucket: "the-pass-45baf.firebasestorage.app",
     messagingSenderId: "68200182297",
