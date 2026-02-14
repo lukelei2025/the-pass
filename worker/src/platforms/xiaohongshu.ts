@@ -1,3 +1,4 @@
+
 /**
  * 小红书平台处理器
  *
@@ -41,15 +42,20 @@ export class XiaohongshuPlatform extends BasePlatform {
         // 检查缓存
         const cache = env.KV;
         if (cache) {
-            const cached = await cache.get(`xhs:${noteId}`, 'json');
-            if (cached && cached.title && cached.title.toLowerCase() !== 'vlog') {
-                const titleStr = `"${cached.title}" #${cached.author || ''}`;
-                return { title: titleStr, author: cached.author || '', cached: true };
+            const cached = await cache.get(`xhs:${noteId}`, 'json') as any;
+            if (cached && cached.title && !this.isInvalidTitle(cached.title)) {
+                // If cached author has .create, clear it but keep title
+                let author = cached.author || '';
+                if (author.includes('.create')) author = '';
+
+                const titleStr = author ? `${cached.title} #${author}` : `${cached.title}`;
+                return { title: titleStr, author, cached: true };
             }
         }
+
         const methods = [
+            () => this.fetchWithMetaTags(url), // Try Meta Tags + JSON first (More reliable for official page)
             () => this.fetchWithJinaReader(url, env),
-            () => this.fetchWithMetaTags(url),
         ];
 
         for (const method of methods) {
@@ -59,9 +65,13 @@ export class XiaohongshuPlatform extends BasePlatform {
                     continue;
                 }
 
-                if (result?.title && result.title.toLowerCase() !== 'vlog') {
+                if (result?.title && !this.isInvalidTitle(result.title)) {
                     const title = result.title.replace(/\s*-\s*小红书$/, '').trim();
-                    const author = result.author || '';
+                    let author = result.author || '';
+
+                    if (author.includes('.create')) {
+                        author = '';
+                    }
 
                     if (cache && title) {
                         await cache.put(`xhs:${noteId}`, JSON.stringify({ title, author }), {
@@ -69,7 +79,7 @@ export class XiaohongshuPlatform extends BasePlatform {
                         });
                     }
 
-                    const titleStr = author ? `"${title}" #${author}` : `"${title}"`;
+                    const titleStr = author ? `${title} #${author}` : `${title}`;
                     return { title: titleStr, author };
                 }
             } catch (error: any) {
@@ -108,11 +118,16 @@ export class XiaohongshuPlatform extends BasePlatform {
 
     private async fetchWithMetaTags(url: string): Promise<XiaohongshuResult> {
         try {
+            // Use Desktop UA to get SSR content with __INITIAL_STATE__
+            const desktopUA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
             const response = await fetch(url, {
                 headers: {
-                    'User-Agent': USER_AGENTS.XIAOHOUGSHU,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': desktopUA,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
                 },
                 signal: AbortSignal.timeout(CONFIG.TIMEOUT),
                 redirect: 'follow',
@@ -124,86 +139,60 @@ export class XiaohongshuPlatform extends BasePlatform {
 
             const html = await response.text();
 
-            const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
-            const descMatch = html.match(/<meta property="og:description" content="([^"]+)"/);
-            const imageMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
+            let title = '';
+            let author = '';
+            let description = '';
 
-            let title = titleMatch ? decodeEntities(titleMatch[1]) : '';
-            const description = descMatch ? decodeEntities(descMatch[1]) : '';
-
-            const trimmedTitle = title.trim();
-            if (!trimmedTitle || trimmedTitle.toLowerCase() === 'vlog' || trimmedTitle === '小红书') {
-                return { error: 'Generic title' };
+            // 1. Try robust JSON extraction first (Most reliable)
+            const stateResult = this.extractFromInitialState(html);
+            if (stateResult) {
+                if (stateResult.title && !this.isInvalidTitle(stateResult.title)) title = stateResult.title;
+                if (stateResult.author) author = stateResult.author;
+                if (stateResult.desc) description = stateResult.desc;
             }
 
-            if (!title || title.toLowerCase() === 'vlog') {
-                if (description) {
-                    title = description.length > 50 ? `${description.substring(0, 50)}...` : description;
+            // 2. Fallback to Meta Tags if JSON failed or missing title
+            if (this.isInvalidTitle(title)) {
+                const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
+                const descMatch = html.match(/<meta property="og:description" content="([^"]+)"/);
+
+                const metaTitle = titleMatch ? decodeEntities(titleMatch[1]) : '';
+                const metaDesc = descMatch ? decodeEntities(descMatch[1]) : '';
+
+                if (!this.isInvalidTitle(metaTitle)) {
+                    title = metaTitle;
+                } else if (metaDesc) {
+                    // Use description as title if title is vlog
+                    title = metaDesc.length > 50 ? `${metaDesc.substring(0, 50)}...` : metaDesc;
                 }
+
+                if (!description) description = metaDesc;
             }
 
-            if (!title || title.toLowerCase() === 'vlog') {
+            // 3. Fallback to <title> tag
+            if (this.isInvalidTitle(title)) {
                 const tagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
                 if (tagMatch) {
-                    title = decodeEntities(tagMatch[1]).replace(/\s*-\s*小红书$/, '').trim();
+                    const tagTitle = decodeEntities(tagMatch[1]).replace(/\s*-\s*小红书$/, '').trim();
+                    if (!this.isInvalidTitle(tagTitle)) {
+                        title = tagTitle;
+                    }
                 }
             }
 
-            const finalTitle = title.trim();
-            if (!finalTitle || finalTitle.toLowerCase() === 'vlog' || finalTitle === '小红书') {
-                return { error: 'Generic title' };
-            }
-
-            let author = '';
-            let initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.+?});?/s);
-            if (!initialStateMatch) {
-                initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[^;]+)/);
-            }
-
-            if (initialStateMatch) {
-                try {
-                    let jsonStr = initialStateMatch[1];
-                    if (jsonStr.length > 100000) {
-                        jsonStr = jsonStr.substring(0, 100000);
-                    }
-                    jsonStr = jsonStr.replace(/undefined/g, 'null');
-                    const data = JSON.parse(jsonStr);
-
-                    if (data?.note?.noteDetailMap) {
-                        const keys = Object.keys(data.note.noteDetailMap);
-                        if (keys.length > 0) {
-                            const firstNote = data.note.noteDetailMap[keys[0]];
-                            if (firstNote?.noteCard?.user) {
-                                author = firstNote.noteCard.user.nickname ||
-                                    firstNote.noteCard.user.name ||
-                                    firstNote.noteCard.user.username || '';
-                            }
-                        }
-                    }
-                } catch {
-                }
-            }
-
+            // 4. Fallback Author regex
             if (!author) {
-                const scriptPatterns = [
-                    /"nickname":"([^"]+)"/,
-                    /"user":\{[^}]*"nickname":"([^"]+)"/,
-                    /"username":"([^"]+)"/,
-                ];
+                const authMatch = html.match(/"nickname":"([^"]+)"/);
+                if (authMatch) author = authMatch[1];
+            }
 
-                for (const pattern of scriptPatterns) {
-                    const match = html.match(pattern);
-                    if (match && match[1]) {
-                        if (match[1].length >= 2 && match[1].length <= 50) {
-                            author = match[1];
-                            break;
-                        }
-                    }
-                }
+            // Final validation
+            if (this.isInvalidTitle(title)) {
+                return { error: 'Generic title' };
             }
 
             return {
-                title: finalTitle,
+                title: title.trim(),
                 author,
                 description,
                 method: 'meta_tags',
@@ -214,6 +203,92 @@ export class XiaohongshuPlatform extends BasePlatform {
             }
             return { error: error.message };
         }
+    }
+
+    /**
+     * Validates and extracts JSON from window.__INITIAL_STATE__
+     */
+    private extractFromInitialState(html: string): { title?: string, author?: string, desc?: string } | null {
+        const marker = 'window.__INITIAL_STATE__=';
+        const startIndex = html.indexOf(marker);
+        if (startIndex === -1) return null;
+
+        let cursor = startIndex + marker.length;
+        // Skip whitespace
+        while (cursor < html.length && /\s/.test(html[cursor])) cursor++;
+
+        if (html[cursor] !== '{') return null;
+
+        // Simple stack-based extraction
+        let balance = 0;
+        let inString = false;
+        let escaped = false;
+        let startJson = cursor;
+
+        for (let i = cursor; i < html.length; i++) {
+            const char = html[i];
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (char === '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (char === '{') balance++;
+                else if (char === '}') {
+                    balance--;
+                    if (balance === 0) {
+                        const jsonStr = html.substring(startJson, i + 1);
+                        try {
+                            const cleanJson = jsonStr.replace(/undefined/g, 'null');
+                            const data = JSON.parse(cleanJson);
+
+                            // Traverse common paths
+                            let title, author, desc;
+
+                            // Path 1: note.note
+                            if (data?.note?.note) {
+                                title = data.note.note.title;
+                                desc = data.note.note.desc;
+                                author = data.note.note.user?.nickname || data.note.note.user?.name;
+                            }
+                            // Path 2: note.firstNote
+                            else if (data?.note?.firstNote) {
+                                title = data.note.firstNote.title;
+                                desc = data.note.firstNote.desc;
+                                author = data.note.firstNote.user?.nickname || data.note.firstNote.user?.name;
+                            }
+                            // Path 3: note.noteDetailMap (Map of notes)
+                            else if (data?.note?.noteDetailMap) {
+                                const vals = Object.values(data.note.noteDetailMap) as any[];
+                                if (vals.length > 0) {
+                                    const note = vals[0].note || vals[0]; // Sometimes nested
+                                    title = note.title;
+                                    desc = note.desc;
+                                    author = note.user?.nickname || note.user?.name;
+                                }
+                            }
+
+                            return { title, author, desc };
+
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -284,94 +359,29 @@ export class XiaohongshuPlatform extends BasePlatform {
 
         if (!result.title) {
             const firstLine = cleanContent.split('\n')[0];
-            if (firstLine && !firstLine.includes('Title:') && !firstLine.includes('.create')) {
+            if (firstLine && !firstLine.includes('Title:') && firstLine.length < 100) {
                 result.title = firstLine.trim();
             }
         }
 
         const authorPatterns = [
-            /by\s+([a-zA-Z0-9_]+)/i,
-            /发布者[:：]\s*([a-zA-Z0-9_]+)/,
-            /作者[:：]\s*([a-zA-Z0-9_]+)/,
-            /([a-zA-Z0-9_]+\.create)/,
-            /([^\s]+\.create)\s*关注/,
+            /by\s+([a-zA-Z0-9_\u4e00-\u9fa5]+)/i,
+            /发布者[:：]\s*([a-zA-Z0-9_\u4e00-\u9fa5]+)/,
+            /作者[:：]\s*([a-zA-Z0-9_\u4e00-\u9fa5]+)/,
         ];
+
         for (const pattern of authorPatterns) {
             const match = cleanContent.match(pattern);
             if (match && match[1] && !result.author) {
-                result.author = match[1];
-                break;
+                if (!match[1].includes('.create')) {
+                    result.author = match[1];
+                    break;
+                }
             }
         }
-
-        const tagsIndex = cleanContent.indexOf('\n#');
-        if (tagsIndex > 0) {
-            let rawContent = cleanContent.substring(0, tagsIndex);
-            rawContent = rawContent.replace(/^[^\n]+\n/, '').trim();
-            const cleaned = this.cleanContentText(rawContent);
-            result.description = cleaned.substring(0, 200);
-        }
-
         return result;
     }
 
-    private cleanContentText(text: string): string {
-        const junkPatterns = [
-            /\*\s*发现/,
-            /\*\s*发布/,
-            /\*\s*通知/,
-            /登录$/,
-            /我$/,
-            /关注/,
-            /\d+:\d+\s*\d+:\d+/, 
-            /[\d.]+x\s*倍速/,
-            /请\s+刷新\s+试试/,
-            /内容可能使用AI技术生成/,
-            /加载中/,
-            /去首页.*?笔记/,
-            /登录后评论/,
-            /发送\s+取消/,
-            /我要申诉/,
-            /温馨提示/,
-            /沪ICP备.*/,
-            /营业执照.*/,
-            /公网安备.*/,
-            /增值电信.*/,
-            /医疗器械.*/,
-            /互联网药品.*/,
-            /违法不良.*/,
-            /举报中心.*/,
-            /有害信息.*/,
-            /自营经营者.*/,
-            /网络文化.*/,
-            /个性化推荐.*/,
-            /行吟信息.*/,
-            /地址：.*/,
-            /电话：.*/,
-            /©\s*\d{4}/,
-            /更多$/,
-            /活动$/,
-            /创作服务$/,
-            /直播管理$/,
-            /电脑直播助手$/,
-            /专业号$/,
-            /推广合作$/,
-            /蒲公英$/,
-            /商家入驻$/,
-            /MCN入驻/,
-            /举报$/,
-        ];
-
-        let cleaned = text;
-        for (const pattern of junkPatterns) {
-            cleaned = cleaned.replace(pattern, '');
-        }
-        return cleaned.replace(/\n{3,}/g, '\n\n').trim();
-    }
-
-    /**
-     * 提取主机名
-     */
     private extractHostname(url: string): string {
         try {
             const urlObj = new URL(url);
@@ -379,5 +389,17 @@ export class XiaohongshuPlatform extends BasePlatform {
         } catch {
             return '';
         }
+    }
+
+    private isInvalidTitle(title: string | undefined | null): boolean {
+        if (!title) return true;
+
+        const lower = title.toLowerCase().trim();
+        if (lower === '' || lower === 'vlog' || lower === '小红书') return true;
+
+        const stripped = lower.replace(/[^a-z0-9\u4e00-\u9fa5]/g, '');
+        if (stripped === 'vlog') return true;
+
+        return false;
     }
 }

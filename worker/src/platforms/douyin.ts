@@ -1,3 +1,4 @@
+
 /**
  * 抖音平台处理器
  *
@@ -42,7 +43,12 @@ export class DouyinPlatform extends BasePlatform {
             const html = await response.text();
 
             // 抖音返回的数据在 window._ROUTER_DATA 中
-            const { title, author } = this.extractMetadataFromHtml(html);
+            const { title: rawTitle, author } = this.extractMetadataFromHtml(html);
+
+            let title = rawTitle;
+            if (title) {
+                title = author ? `${title} #${author}` : `${title}`;
+            }
 
             return { title, author, method: 'douyin_html' };
         } catch (error: any) {
@@ -99,8 +105,9 @@ export class DouyinPlatform extends BasePlatform {
                         const author = item.author?.nickname || '';
 
                         title = title.replace(/#\S+\s*/g, ' ').trim();
-                        if (title.length > 80) {
-                            title = title.substring(0, 80) + '...';
+                        // Truncate to 40 chars
+                        if (title.length > 40) {
+                            title = title.substring(0, 40) + '...';
                         }
 
                         if (!title) {
