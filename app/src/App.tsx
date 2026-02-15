@@ -10,10 +10,11 @@ import FreezerView from './views/FreezerView';
 import HistoryView from './views/HistoryView';
 import SettingsView from './views/SettingsView';
 import LoginPage from './views/LoginPage';
+import UserAvatarMenu from './components/UserAvatarMenu';
 
 function AppContent() {
   const { currentView, checkExpired, setCurrentView, initializeForUser } = useStore();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
 
@@ -76,7 +77,7 @@ function AppContent() {
         <aside className="glass-sidebar w-[260px] flex-shrink-0 h-screen sticky top-0 flex flex-col pt-8 pb-4 px-3 z-50">
           <div className="px-3 mb-6">
             <h1 className="text-[15px] font-semibold text-[var(--color-ink)] tracking-tight flex items-center gap-2">
-              <span className="w-5 h-5 bg-[#333] rounded-md text-white flex items-center justify-center text-xs">P</span>
+              <img src="/favicon-32x32.png" alt="The Pass" className="w-5 h-5 rounded" />
               {t.appName}
             </h1>
           </div>
@@ -99,32 +100,11 @@ function AppContent() {
             ))}
           </nav>
 
-          <div className="mt-auto px-3 py-2 border-t border-[rgba(0,0,0,0.06)] space-y-1">
-            <button
-              onClick={() => setCurrentView('settings')}
-              className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${currentView === 'settings' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-secondary)] hover:text-[var(--color-ink)]'
-                }`}
-            >
-              <svg className="w-4 h-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" /></svg>
-              {t.settings.title}
-            </button>
-
-            {/* User info + Sign out */}
-            <div className="flex items-center gap-2 px-3 py-1.5">
-              {user.photoURL && (
-                <img src={user.photoURL} alt="" className="w-5 h-5 rounded-full" />
-              )}
-              <span className="text-[12px] text-[var(--color-ink-secondary)] truncate flex-1">
-                {user.displayName || user.email}
-              </span>
-              <button
-                onClick={signOut}
-                className="text-[11px] text-[var(--color-ink-tertiary)] hover:text-[var(--color-red)] transition-colors"
-                title="Sign out"
-              >
-                ↗
-              </button>
-            </div>
+          <div className="mt-auto px-3 py-3 border-t border-[rgba(0,0,0,0.06)] flex items-center">
+            <UserAvatarMenu />
+            <span className="ml-2 text-[12px] text-[var(--color-ink-secondary)] truncate flex-1">
+              {user.displayName || user.email}
+            </span>
           </div>
         </aside>
       )}
@@ -135,18 +115,7 @@ function AppContent() {
         {isMobile && (
           <header className="glass-header sticky top-0 z-40 px-4 h-12 flex items-center justify-between flex-shrink-0">
             <div className="text-[17px] font-semibold text-[var(--color-ink)]">{t.appName}</div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setCurrentView('settings')} className="text-[var(--color-accent)] text-[15px]">{t.settings.title}</button>
-              {user.photoURL && (
-                <img
-                  src={user.photoURL}
-                  alt=""
-                  className="w-6 h-6 rounded-full cursor-pointer"
-                  onClick={signOut}
-                  title="Sign out"
-                />
-              )}
-            </div>
+            <UserAvatarMenu size="sm" />
           </header>
         )}
 

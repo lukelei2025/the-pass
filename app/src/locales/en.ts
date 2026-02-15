@@ -140,6 +140,22 @@ export const en = {
         offline: 'Offline mode, please select manually',
         changeCategory: 'Change category',
     },
+
+    // Login
+    login: {
+        subtitle: 'Your digital workbench for capturing, classifying, and managing information flow.',
+        google: 'Sign in with Google',
+        or: 'or',
+        emailPlaceholder: 'Enter your email',
+        sendLink: 'Send Link',
+        magicLinkDesc: 'We\'ll send a magic link to your email for password-free login.',
+        magicLinkSent: 'Link Sent!',
+        magicLinkSentDesc: 'Check your inbox and click the link to sign in.',
+        magicLinkError: 'Failed to send link. Please try again.',
+        tryAnotherEmail: 'Use a different email',
+        footer: 'Your data syncs automatically after login.',
+        logout: 'Log Out',
+    },
 };
 
 export type Locale = typeof en;

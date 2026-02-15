@@ -10,7 +10,7 @@ export default function SettingsView() {
             <div className="flex items-center gap-4 pb-4 border-b border-[var(--color-border)]">
                 <button
                     onClick={() => setCurrentView('workbench')}
-                    className="md:hidden text-[var(--color-accent)] text-[15px] font-medium"
+                    className="text-[var(--color-accent)] text-[15px] font-medium"
                 >
                     &larr; {t.settings.back}
                 </button>

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 
 /**
@@ -66,5 +66,8 @@ try {
 }
 
 export { db };
+
+// Email Magic Link utilities
+export { sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink };
 
 export default app;

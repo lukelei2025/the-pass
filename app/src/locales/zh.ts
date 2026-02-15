@@ -142,4 +142,20 @@ export const zh: Locale = {
         offline: '离线模式，请手动选择',
         changeCategory: '更改分类',
     },
+
+    // Login
+    login: {
+        subtitle: '你的数字工作台，捕捉、分类、管理信息流。',
+        google: '使用 Google 登录',
+        or: '或',
+        emailPlaceholder: '输入你的邮箱',
+        sendLink: '发送链接',
+        magicLinkDesc: '我们会发送一个登录链接到你的邮箱，无需密码。',
+        magicLinkSent: '链接已发送！',
+        magicLinkSentDesc: '请查看你的收件箱，点击链接即可登录。',
+        magicLinkError: '发送失败，请重试。',
+        tryAnotherEmail: '使用其他邮箱',
+        footer: '登录后数据将自动云端同步',
+        logout: '退出登录',
+    },
 };

@@ -10,7 +10,7 @@ export default defineConfig({
     fetchTitlePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon-32x32.png', 'favicon-16x16.png', 'apple-touch-icon.png'],
       workbox: {
         // 强制立即激活新的 Service Worker
         skipWaiting: true,
