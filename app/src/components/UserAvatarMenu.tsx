@@ -49,11 +49,21 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
     const getMenuPosition = () => {
         if (!buttonRef.current) return {};
         const rect = buttonRef.current.getBoundingClientRect();
-        // 菜单在按钮上方弹出，左对齐
+
+        // 移动端 (宽 < 768px)：向下弹出
+        if (window.innerWidth < 768) {
+            return {
+                position: 'fixed' as const,
+                left: `${rect.left}px`,
+                top: `${rect.bottom + 8}px`, // 向下
+            };
+        }
+
+        // 桌面端：向上弹出 (保持原有逻辑)
         return {
             position: 'fixed' as const,
             left: `${rect.left}px`,
-            bottom: `${window.innerHeight - rect.top + 8}px`,
+            bottom: `${window.innerHeight - rect.top + 8}px`, // 向上
         };
     };
 

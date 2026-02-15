@@ -5,6 +5,8 @@ import {
     signInWithRedirect,
     getRedirectResult,
     signOut as firebaseSignOut,
+    setPersistence,
+    browserLocalPersistence,
     type User
 } from 'firebase/auth';
 import {
@@ -83,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signIn = async () => {
         try {
+            // Force local persistence to ensure session survives browser restarts/PWA relaunches
+            await setPersistence(auth, browserLocalPersistence);
+
             console.log('[Auth] Attempting Google sign in...');
             if (isPWAMode()) {
                 console.log('[Auth] PWA mode detected, using redirect sign-in');
