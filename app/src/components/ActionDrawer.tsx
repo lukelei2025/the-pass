@@ -45,8 +45,11 @@ export default function ActionDrawer({ isOpen, onClose, onAction, hideBackdrop, 
                             key={action.id}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onAction(action.id);
                                 onClose();
+                                // Delay action slightly to allow drawer to close and prevent z-index conflict/touch ghosting
+                                setTimeout(() => {
+                                    onAction(action.id);
+                                }, 50);
                             }}
                             className="flex flex-col items-center gap-1.5"
                         >
