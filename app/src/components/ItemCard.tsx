@@ -72,36 +72,37 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       onClick={handleCardClick}
       className={`group flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-200 relative overflow-hidden cursor-pointer ${!isTodo && !isMobile ? 'md:cursor-default' : ''}`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {/* Category Tag */}
-          <CategoryTag category={safeCategory}>
-            {t.categories[safeCategory]}
-          </CategoryTag>
+      {!isTodo && (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            {/* Category Tag */}
+            <CategoryTag category={safeCategory}>
+              {t.categories[safeCategory]}
+            </CategoryTag>
 
-          {/* Platform Tag */}
-          {item.type === 'link' && item.source && !item.source.startsWith('http') && (
-            <span className="px-2 py-0.5 rounded text-[13px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
-              {item.source}
-            </span>
-          )}
-        </div>
+            {/* Platform Tag */}
+            {item.type === 'link' && item.source && !item.source.startsWith('http') && (
+              <span className="px-2 py-0.5 rounded text-[13px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
+                {item.source}
+              </span>
+            )}
+          </div>
 
-        {/* Time with Indicator */}
-        {isTodo ? (
-          item.deadline ? (
-            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded ${getDeadlineColor(item.deadline)}`}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-              {formatDeadline(item.deadline)}
-            </div>
-          ) : null
-        ) : (
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-ink-secondary)]">
             <span className={`w-1.5 h-1.5 rounded-full ${indicatorColor}`} />
             {remainingText}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {isTodo && item.deadline && (
+        <div className="flex items-center justify-end mb-3">
+          <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded ${getDeadlineColor(item.deadline)}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            {formatDeadline(item.deadline)}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-h-[3rem]">

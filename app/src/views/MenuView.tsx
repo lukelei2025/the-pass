@@ -5,7 +5,6 @@ import ItemCard from '../components/ItemCard';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFilters } from '../hooks/useFilters';
 import SearchBar from '../components/ui/SearchBar';
-import { CategoryFilterPills, SourceFilterPills, ClearFiltersButton } from '../components/ui/FilterPills';
 
 export default function MenuView() {
   const { items } = useStore();
@@ -22,15 +21,9 @@ export default function MenuView() {
   // 使用 useFilters Hook
   const {
     searchQuery,
-    selectedCategories,
-    selectedSources,
     filteredItems,
-    availableCategories,
-    availableSources,
     hasActiveFilters,
     setSearchQuery,
-    toggleCategory,
-    toggleSource,
     clearAllFilters,
   } = useFilters(todoItems);
 
@@ -51,29 +44,7 @@ export default function MenuView() {
         placeholder="Search items to prep..."
       />
 
-      {/* Filters */}
-      {(availableCategories.length > 0 || availableSources.length > 0) && (
-        <div className="space-y-2">
-          <CategoryFilterPills
-            categories={availableCategories}
-            selectedCategories={selectedCategories}
-            onToggleCategory={toggleCategory}
-            getCategoryLabel={(cat) => t.categories[cat]}
-          />
-
-          <SourceFilterPills
-            sources={availableSources}
-            selectedSources={selectedSources}
-            onToggleSource={toggleSource}
-          />
-
-          {hasActiveFilters && (
-            <ClearFiltersButton onClick={clearAllFilters}>
-              Clear all filters
-            </ClearFiltersButton>
-          )}
-        </div>
-      )}
+      {/* Filters REVOVED by user request */}
 
       {/* Items Grid */}
       {filteredItems.length > 0 ? (

@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { mapCategory } from '../lib/constants';
 import { useTranslation } from '../hooks/useTranslation';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 export default function HistoryView() {
   const { items, clearHistory, cleanupOldHistory } = useStore();
   const { t } = useTranslation();
   const [isClearing, setIsClearing] = useState(false);
+  const isMobile = useIsMobile();
 
-  // Auto-cleanup on mount
+  // ... (rest of the logic remains the same)
   useEffect(() => {
     cleanupOldHistory(48);
   }, [cleanupOldHistory]);
@@ -17,35 +19,36 @@ export default function HistoryView() {
   const retentionMs = 48 * 60 * 60 * 1000;
 
   const processedItems = items.filter(item => {
-    // 1. Must be a history status
     if (!['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)) return false;
-
-    // 2. Must be within 48 hours
     const time = item.processedAt || item.createdAt;
     return (now - time) <= retentionMs;
   }).sort((a, b) => (b.processedAt || b.createdAt) - (a.processedAt || a.createdAt));
 
   const handleClearHistory = async () => {
     if (processedItems.length === 0) return;
-
-    const confirmed = window.confirm(
-      `确定要清空所有 ${processedItems.length} 条历史记录吗？此操作不可恢复。`
-    );
+    const confirmed = window.confirm(`确定要清空所有 ${processedItems.length} 条历史记录吗？`);
     if (!confirmed) return;
-
     setIsClearing(true);
     try {
       await clearHistory();
     } catch (error) {
-      console.error('清空历史记录失败:', error);
-      alert('清空失败，请重试');
+      console.error('Failed to clear history:', error);
     } finally {
       setIsClearing(false);
     }
   };
 
+  const statusMap: Record<string, string> = {
+    cooked: t.actions.clear,
+    todo: t.actions.todo,
+    frozen: t.actions.stash,
+    composted: t.actions.void,
+    expired: 'Expired',
+  };
+
   return (
     <div className="space-y-6 pb-20">
+      {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
         <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.history.title}</h2>
         <div className="flex items-center gap-3">
@@ -56,30 +59,24 @@ export default function HistoryView() {
             <button
               onClick={handleClearHistory}
               disabled={isClearing}
-              className="px-3 py-1.5 text-[12px] font-medium text-[var(--color-red)] border border-[var(--color-red)] rounded-md hover:bg-[var(--color-red)] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-[12px] font-medium text-[var(--color-red)] border border-[var(--color-red)] rounded-md hover:bg-[var(--color-red)] hover:text-white transition-colors"
             >
-              {isClearing ? '清空中...' : t.history.clearHistory}
+              {isClearing ? '...' : t.history.clearHistory}
             </button>
           )}
         </div>
       </div>
 
-      {/* Statistics Grid */}
+      {/* Stats Grid - Kept as is from previous step (already improved) */}
       <div className="mb-12">
         {(() => {
-          // Calculate Stats
           const totalZaps = items.length;
           const processedCount = items.filter(i => i.status !== 'pending').length;
           const processRate = totalZaps > 0 ? Math.round((processedCount / totalZaps) * 100) : 0;
-
-          // Todo stats: 
-          // We assume 'todo' = Active, 'cooked' = Completed. 
-          // Total Todos = Active + Completed.
           const activeTodos = items.filter(i => i.status === 'todo').length;
           const completedTodos = items.filter(i => i.status === 'cooked').length;
           const totalTodos = activeTodos + completedTodos;
           const completionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
-
           const stashedCount = items.filter(i => i.status === 'frozen').length;
 
           const StatsCard = ({ label, value, colorClass }: { label: string, value: string | number, colorClass: string }) => (
@@ -90,29 +87,20 @@ export default function HistoryView() {
           );
 
           return (
-            <div className="flex flex-wrap gap-8 items-center px-1">
-              {/* Group 1: Green */}
-              <div className="flex items-center gap-8">
+            <div className="flex flex-wrap gap-y-8 gap-x-4 md:gap-x-12 items-center px-1">
+              <div className="flex items-center gap-4 md:gap-8">
                 <StatsCard label={t.history.stats.cumulativeZaps} value={totalZaps} colorClass="text-[#059669]" />
                 <StatsCard label={t.history.stats.cumulativeProcessed} value={processedCount} colorClass="text-[#059669]" />
                 <StatsCard label={t.history.stats.processRate} value={`${processRate}%`} colorClass="text-[#059669]" />
               </div>
-
-              {/* Divider */}
-              <div className="w-px h-8 bg-black/5 hidden md:block" />
-
-              {/* Group 2: Blue */}
-              <div className="flex items-center gap-8">
+              <div className="w-px h-8 bg-black/5 hidden lg:block" />
+              <div className="flex items-center gap-4 md:gap-8">
                 <StatsCard label={t.history.stats.cumulativeTodos} value={totalTodos} colorClass="text-[#2563EB]" />
                 <StatsCard label={t.history.stats.completedTodos} value={completedTodos} colorClass="text-[#2563EB]" />
                 <StatsCard label={t.history.stats.completionRate} value={`${completionRate}%`} colorClass="text-[#2563EB]" />
               </div>
-
-              {/* Divider */}
-              <div className="w-px h-8 bg-black/5 hidden md:block" />
-
-              {/* Group 3: Orange */}
-              <div className="flex items-center gap-8">
+              <div className="w-px h-8 bg-black/5 hidden xl:block" />
+              <div className="flex items-center gap-4 md:gap-8">
                 <StatsCard label={t.history.stats.stashed} value={stashedCount} colorClass="text-[#D97706]" />
               </div>
             </div>
@@ -129,47 +117,70 @@ export default function HistoryView() {
           {t.history.empty}
         </div>
       ) : (
-        <div className="bg-white border border-[var(--color-border)] rounded-[10px] shadow-sm overflow-hidden">
-          <table className="w-full text-left text-[13px]">
-            <thead className="bg-[var(--color-bg-app)] border-b border-[var(--color-border)] text-[var(--color-ink-secondary)] font-medium">
-              <tr>
-                <th className="px-4 py-3 font-medium w-32">{t.history.action}</th>
-                <th className="px-4 py-3 font-medium w-32">{t.history.category}</th>
-                <th className="px-4 py-3 font-medium">{t.history.content}</th>
-                <th className="px-4 py-3 font-medium w-32 text-right">{t.history.date}</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="bg-white border border-[var(--color-border)] rounded-[10px] shadow-sm overflow-hidden text-[13px]">
+          {isMobile ? (
+            /* Stacked Layout for Mobile */
+            <div className="divide-y divide-[var(--color-border)]">
               {processedItems.map((item) => {
-                const statusMap: Record<string, string> = {
-                  cooked: t.actions.clear,
-                  todo: t.actions.todo,
-                  frozen: t.actions.stash,
-                  composted: t.actions.void,
-                  expired: 'Expired',
-                };
                 const safeCategory = mapCategory(item.category);
                 return (
-                  <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
-                    <td className="px-4 py-3 font-medium text-[var(--color-ink-secondary)]">
-                      {statusMap[item.status] || item.status}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
-                        {t.categories[safeCategory]}
+                  <div key={item.id} className="p-3.5 space-y-1.5 hover:bg-[var(--color-surface-hover)] transition-colors">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-[var(--color-ink-secondary)] uppercase tracking-wider">
+                          {statusMap[item.status] || item.status}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-tertiary)] opacity-80">
+                          {t.categories[safeCategory]}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)] font-mono">
+                        {new Date(item.processedAt || item.createdAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-xs" title={item.content}>
+                    </div>
+                    <p className="text-[14px] leading-snug text-[var(--color-ink)] line-clamp-2" title={item.content}>
                       {item.title || item.content}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono">
-                      {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
+                    </p>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            /* Standard Table for Desktop */
+            <table className="w-full text-left">
+              <thead className="bg-[var(--color-bg-app)] border-b border-[var(--color-border)] text-[var(--color-ink-secondary)]">
+                <tr>
+                  <th className="px-4 py-3 font-normal w-24">{t.history.action}</th>
+                  <th className="px-4 py-3 font-normal w-24">{t.history.category}</th>
+                  <th className="px-4 py-3 font-normal">{t.history.content}</th>
+                  <th className="px-4 py-3 font-normal w-32 text-right">{t.history.date}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processedItems.map((item) => {
+                  const safeCategory = mapCategory(item.category);
+                  return (
+                    <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
+                      <td className="px-4 py-3 text-[var(--color-ink-secondary)] whitespace-nowrap">
+                        {statusMap[item.status] || item.status}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
+                          {t.categories[safeCategory]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-sm" title={item.content}>
+                        {item.title || item.content}
+                      </td>
+                      <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono whitespace-nowrap">
+                        {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
