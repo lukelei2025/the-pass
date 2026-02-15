@@ -67,7 +67,7 @@ function AppContent() {
     { id: 'workbench', label: t.nav.zapIn, icon: 'M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5z' }, // Rounded Square
     { id: 'menu', label: t.nav.todo, icon: 'M3 21h18L12 3 3 21z' }, // Triangle
     { id: 'freezer', label: t.nav.stash, icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' }, // Star
-    { id: 'history', label: t.nav.traces, icon: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12 M3 3v9h9 M12 7v5l4 2' }, // History/Traces
+    { id: 'history', label: t.nav.traces, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z' }, // Circle/Traces
   ] as const;
 
   return (
