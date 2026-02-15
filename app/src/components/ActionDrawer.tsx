@@ -36,22 +36,22 @@ export default function ActionDrawer({ isOpen, onClose, onAction, hideBackdrop, 
             )}
 
             {/* Bottom Sheet */}
-            <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-[20px] p-4 animate-in slide-in-from-bottom duration-300">
-                <div className="w-12 h-1.5 bg-[rgba(0,0,0,0.1)] rounded-full mx-auto mb-6" />
+            <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-white rounded-t-[20px] pt-3 px-4 pb-2 animate-in slide-in-from-bottom duration-300">
+                <div className="w-12 h-1.5 bg-[rgba(0,0,0,0.1)] rounded-full mx-auto mb-4" />
 
-                <div className={`grid gap-4 pb-4`} style={{ gridTemplateColumns: `repeat(${actions.length}, minmax(0, 1fr))` }}>
+                <div className={`grid gap-4 pb-2`} style={{ gridTemplateColumns: `repeat(${actions.length}, minmax(0, 1fr))` }}>
                     {actions.map(action => (
                         <button
                             key={action.id}
                             onClick={() => { onAction(action.id); onClose(); }}
-                            className="flex flex-col items-center gap-2"
+                            className="flex flex-col items-center gap-1.5"
                         >
-                            <div className={`w-12 h-12 rounded-full ${action.bg} flex items-center justify-center ${action.color}`}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <div className={`w-10 h-10 rounded-full ${action.bg} flex items-center justify-center ${action.color}`}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                     {action.icon}
                                 </svg>
                             </div>
-                            <span className={`text-[12px] font-semibold ${action.isRed ? 'text-[var(--color-red)]' : ''}`}>{action.label}</span>
+                            <span className={`text-[11px] font-semibold ${action.isRed ? 'text-[var(--color-red)]' : ''}`}>{action.label}</span>
                         </button>
                     ))}
                 </div>
