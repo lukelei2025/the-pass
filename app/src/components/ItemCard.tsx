@@ -162,12 +162,12 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         {/* Only show 'Todo' button if NOT already in todo */}
         {!isTodo && (
           <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title={t.actions.todo} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99z" /></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18L12 3 3 21z" /></svg>
             <span className="text-[13px] font-semibold">{t.actions.todo}</span>
           </button>
         )}
         <button onClick={(e) => { e.stopPropagation(); handleAction('frozen'); }} title={t.actions.stash} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
           <span className="text-[13px] font-semibold">{t.actions.stash}</span>
         </button>
         <button onClick={(e) => { e.stopPropagation(); handleAction('composted'); }} title={t.actions.void} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-red)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
