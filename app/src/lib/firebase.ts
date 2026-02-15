@@ -34,7 +34,7 @@ const validateFirebaseConfig = () => {
 
 const firebaseConfig = {
     apiKey: validateFirebaseConfig(),
-    authDomain: "the-pass-45baf.firebaseapp.com",
+    authDomain: "the-pass-45baf.web.app",
     projectId: "the-pass-45baf",
     storageBucket: "the-pass-45baf.firebasestorage.app",
     messagingSenderId: "68200182297",
