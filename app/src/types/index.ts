@@ -86,3 +86,14 @@ export interface CategoryInfo {
   icon: string;
   color: string;
 }
+
+/**
+ * 用户累计统计（持久化，不受清理影响）
+ */
+export interface UserStats {
+  totalZaps: number;       // 累计乱入
+  totalProcessed: number;  // 累计处理 (cooked + todo + frozen + composted)
+  totalTodos: number;      // 累计待办
+  completedTodos: number;  // 已完成待办
+  totalStashed: number;    // 累计收藏
+}

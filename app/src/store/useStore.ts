@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import type { Item, Settings, Category, ItemStatus } from '../types';
+import type { Item, Settings, Category, ItemStatus, UserStats } from '../types';
 import * as firestoreService from '../lib/firestoreService';
 
 // 初始化 localForage (kept for migration and offline fallback)
@@ -25,9 +25,18 @@ const defaultSettings: Settings = {
   llmAutoClassify: true,
 };
 
+const defaultUserStats: UserStats = {
+  totalZaps: 0,
+  totalProcessed: 0,
+  totalTodos: 0,
+  completedTodos: 0,
+  totalStashed: 0,
+};
+
 interface StoreState {
   items: Item[];
   settings: Settings;
+  stats: UserStats;
   currentView: 'workbench' | 'menu' | 'freezer' | 'history' | 'settings';
 
   // Auth state
@@ -55,6 +64,9 @@ interface StoreState {
   setUserId: (userId: string | null) => void;
   initializeForUser: (userId: string) => Promise<void>;
 
+  // Stats
+  loadStats: () => Promise<void>;
+
   // 工具方法
   cleanupOldHistory: (retentionHours: number) => Promise<void>;
   checkExpired: () => Promise<void>;
@@ -81,6 +93,7 @@ export const useStore = create<StoreState>()(
     (set, get) => ({
       items: [],
       settings: defaultSettings,
+      stats: defaultUserStats,
       currentView: 'workbench',
       userId: null,
       isOnline: true,
@@ -129,7 +142,15 @@ export const useStore = create<StoreState>()(
           console.error('Failed to load cloud settings:', error);
         }
 
-        // 3. Subscribe to real-time items
+        // 3. Load stats from Firestore
+        try {
+          const cloudStats = await firestoreService.getStats(userId);
+          set({ stats: cloudStats });
+        } catch (error) {
+          console.error('Failed to load cloud stats:', error);
+        }
+
+        // 4. Subscribe to real-time items
         if (unsubscribeItems) {
           unsubscribeItems();
         }
@@ -139,6 +160,18 @@ export const useStore = create<StoreState>()(
         });
 
         set({ userId, isOnline: true });
+      },
+
+      // Load stats from Firestore (for refreshing in HistoryView)
+      loadStats: async () => {
+        const { userId } = get();
+        if (!userId) return;
+        try {
+          const cloudStats = await firestoreService.getStats(userId);
+          set({ stats: cloudStats });
+        } catch (error) {
+          console.error('Failed to load stats:', error);
+        }
       },
 
       // 添加卡片
@@ -155,6 +188,9 @@ export const useStore = create<StoreState>()(
         if (userId) {
           // Online: write to Firestore (real-time subscription will update state)
           await firestoreService.addItem(userId, newItem);
+          // Increment cumulative zap counter
+          await firestoreService.incrementStats(userId, { totalZaps: 1 });
+          set((state) => ({ stats: { ...state.stats, totalZaps: state.stats.totalZaps + 1 } }));
         } else {
           // Offline fallback: write to localForage
           await itemsStore.setItem(newItem.id, newItem);
@@ -167,13 +203,40 @@ export const useStore = create<StoreState>()(
       // 更新卡片
       updateItem: async (id, updates) => {
         const { userId } = get();
+        const oldItem = get().items.find((i) => i.id === id);
 
         if (userId) {
           await firestoreService.updateItem(userId, id, updates);
+
+          // Track status changes for cumulative stats
+          if (updates.status && oldItem && oldItem.status !== updates.status) {
+            const deltas: Partial<Record<keyof UserStats, number>> = {};
+            const newStatus = updates.status;
+
+            // Count as processed when moving out of pending
+            if (oldItem.status === 'pending' && newStatus !== 'pending') {
+              deltas.totalProcessed = 1;
+            }
+            // Track specific destination statuses
+            if (newStatus === 'todo') deltas.totalTodos = 1;
+            if (newStatus === 'frozen') deltas.totalStashed = 1;
+            if (newStatus === 'cooked' && oldItem.status === 'todo') deltas.completedTodos = 1;
+
+            if (Object.keys(deltas).length > 0) {
+              await firestoreService.incrementStats(userId, deltas);
+              // Update local state optimistically
+              set((state) => {
+                const newStats = { ...state.stats };
+                for (const [key, value] of Object.entries(deltas)) {
+                  newStats[key as keyof UserStats] += value!;
+                }
+                return { stats: newStats };
+              });
+            }
+          }
         } else {
-          const item = get().items.find((i) => i.id === id);
-          if (!item) return;
-          const updatedItem = { ...item, ...updates };
+          if (!oldItem) return;
+          const updatedItem = { ...oldItem, ...updates };
           await itemsStore.setItem(id, updatedItem);
           set((state) => ({
             items: state.items.map((i) => (i.id === id ? updatedItem : i)),
@@ -195,11 +258,11 @@ export const useStore = create<StoreState>()(
         }
       },
 
-      // 清空历史记录 (Manual clear all)
+      // 清空历史记录 (只清除已处理/已过期，不动工作台/待办/收藏)
       clearHistory: async () => {
         const { userId, items } = get();
         const historyItems = items.filter(item =>
-          ['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)
+          ['cooked', 'composted', 'expired'].includes(item.status)
         );
 
         if (historyItems.length === 0) return;
@@ -211,7 +274,7 @@ export const useStore = create<StoreState>()(
             await itemsStore.removeItem(item.id);
           }
           set((state) => ({
-            items: state.items.filter((i) => i.status === 'pending'),
+            items: state.items.filter((i) => !['cooked', 'composted', 'expired'].includes(i.status)),
           }));
         }
       },

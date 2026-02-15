@@ -5,10 +5,12 @@ import {
     deleteDoc,
     onSnapshot,
     writeBatch,
-    getDoc
+    getDoc,
+    updateDoc,
+    increment
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Item, Settings } from '../types';
+import type { Item, Settings, UserStats } from '../types';
 
 // ==========================================
 // Items CRUD
@@ -158,4 +160,54 @@ export async function migrateLocalData(
     await updateSettings(userId, localSettings);
 
     console.log('Migration complete!');
+}
+
+// ==========================================
+// User Stats (persistent cumulative counters)
+// ==========================================
+
+const defaultStats: UserStats = {
+    totalZaps: 0,
+    totalProcessed: 0,
+    totalTodos: 0,
+    completedTodos: 0,
+    totalStashed: 0,
+};
+
+const getUserStatsDoc = (userId: string) =>
+    doc(db, 'users', userId, 'stats', 'main');
+
+export async function getStats(userId: string): Promise<UserStats> {
+    const docSnap = await getDoc(getUserStatsDoc(userId));
+    if (docSnap.exists()) {
+        return { ...defaultStats, ...docSnap.data() } as UserStats;
+    }
+    // Initialize stats doc if it doesn't exist
+    await setDoc(getUserStatsDoc(userId), defaultStats);
+    return { ...defaultStats };
+}
+
+/**
+ * Atomically increment one or more stat counters.
+ * Uses Firestore's `increment()` for safe concurrent updates.
+ */
+export async function incrementStats(
+    userId: string,
+    deltas: Partial<Record<keyof UserStats, number>>
+): Promise<void> {
+    const updates: Record<string, ReturnType<typeof increment>> = {};
+    for (const [key, value] of Object.entries(deltas)) {
+        if (value && value !== 0) {
+            updates[key] = increment(value);
+        }
+    }
+    if (Object.keys(updates).length > 0) {
+        try {
+            await updateDoc(getUserStatsDoc(userId), updates);
+        } catch {
+            // Doc might not exist yet, create it first
+            await setDoc(getUserStatsDoc(userId), defaultStats);
+            await updateDoc(getUserStatsDoc(userId), updates);
+        }
+    }
 }
