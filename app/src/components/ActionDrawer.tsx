@@ -18,7 +18,10 @@ export default function ActionDrawer({ isOpen, onClose, onAction }: ActionDrawer
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/40 z-[9998] animate-in fade-in duration-200"
-                onClick={onClose}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                }}
             />
 
             {/* Bottom Sheet */}
