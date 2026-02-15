@@ -98,14 +98,11 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
     } else if (isFrozen) {
         title = t.item.editNote;
     }
-
     return createPortal(
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
             onClick={(e) => {
                 e.stopPropagation();
-                // Optional: Close on backdrop click (if desired, but user issue focused on flickering)
-                // onClose(); 
             }}
         >
             <div
@@ -125,7 +122,6 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                 </div>
 
                 <div className="space-y-4">
-                    {/* Deadline Input - Available for Todo, Hidden for Frozen */}
                     {!isFrozen && (
                         <div className="space-y-2">
                             <label className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{t.todoEditor.deadline}</label>
@@ -146,7 +142,6 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                         </div>
                     )}
 
-                    {/* Details Input */}
                     <div className="space-y-2">
                         <label className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
                             {isFrozen ? t.todoEditor.addNote : t.todoEditor.details}
@@ -159,7 +154,6 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                         />
                     </div>
 
-                    {/* Tags Input - Available for Frozen, Hidden for Todo */}
                     {isFrozen && (
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                             <label className="text-[13px] font-medium text-[var(--color-ink-secondary)] mr-1">{t.todoEditor.tags}</label>
@@ -201,7 +195,6 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                         </div>
                     )}
 
-                    {/* Buttons */}
                     <div className="flex justify-end gap-3 pt-2">
                         <button
                             onClick={onClose}

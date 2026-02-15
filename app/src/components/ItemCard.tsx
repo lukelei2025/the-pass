@@ -42,6 +42,9 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
   const handleCardClick = () => {
     if (isTodo) {
       setIsEditorOpen(true);
+      if (isMobile) {
+        setIsDrawerOpen(true);
+      }
     } else if (isMobile) {
       setIsDrawerOpen(true);
     }
@@ -174,14 +177,17 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       </div>
 
       {/* Mobile Bottom Sheet (Only for non-Todo items) */}
-      {!isTodo && (
-        <ActionDrawer
-          item={item}
-          isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
-          onAction={handleAction}
-        />
-      )}
+      <ActionDrawer
+        item={item}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setIsEditorOpen(false);
+        }}
+        onAction={handleAction}
+        hideBackdrop={isTodo && isMobile && isEditorOpen}
+        excludeAction={isTodo ? 'todo' : undefined}
+      />
 
       {/* Todo Editor Dialog */}
       <TodoEditorDialog
@@ -189,6 +195,7 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         isOpen={isEditorOpen}
         onClose={() => {
           setIsEditorOpen(false);
+          setIsDrawerOpen(false);
           setEditTargetStatus(undefined);
         }}
         newStatus={editTargetStatus}
