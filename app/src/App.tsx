@@ -113,9 +113,30 @@ function AppContent() {
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header */}
         {isMobile && (
-          <header className="glass-header sticky top-0 z-40 px-4 h-12 flex items-center justify-between flex-shrink-0">
-            <div className="text-[17px] font-semibold text-[var(--color-ink)]">{t.appName}</div>
-            <UserAvatarMenu size="sm" />
+          <header className="glass-header sticky top-0 z-40 px-3 h-12 flex items-center justify-between flex-shrink-0 gap-2">
+            <div className="text-[17px] font-semibold text-[var(--color-ink)] truncate">{t.appName}</div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <nav className="flex items-center gap-0.5">
+                {navItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCurrentView(item.id)}
+                    className={`p-2 rounded-lg transition-all ${currentView === item.id
+                      ? 'text-[var(--color-accent)] bg-[var(--color-surface-hover)]'
+                      : 'text-[var(--color-ink-tertiary)] active:text-[var(--color-ink)]'
+                      }`}
+                    title={item.label}
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d={item.icon} />
+                    </svg>
+                  </button>
+                ))}
+              </nav>
+              <div className="w-[1px] h-3 bg-[var(--color-border)] opacity-50" />
+              <UserAvatarMenu size="sm" />
+            </div>
           </header>
         )}
 
@@ -126,25 +147,7 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Mobile Right Side Floating Dock */}
-        {isMobile && (
-          <nav className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-0 bg-white/90 backdrop-blur-xl border-l border-t border-b border-black/5 rounded-l-2xl shadow-lg py-3 px-2">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id)}
-                className={`flex flex-col items-center justify-center gap-1 w-12 h-14 relative transition-all duration-200 ${currentView === item.id ? 'bg-[rgba(0,0,0,0.04)]' : ''}`}
-              >
-                <svg className={`w-6 h-6 transition-all duration-200 ${currentView === item.id ? 'text-[var(--color-accent)]' : 'text-[#999]'}`} viewBox="0 0 24 24" fill="currentColor">
-                  <path d={item.icon} />
-                </svg>
-                <span className={`text-[10px] font-medium whitespace-nowrap ${currentView === item.id ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-secondary)]'}`}>
-                  {item.label}
-                </span>
-              </button>
-            ))}
-          </nav>
-        )}
+
       </main>
     </div>
   );
