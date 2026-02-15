@@ -17,8 +17,8 @@ export default function ActionDrawer({ isOpen, onClose, onAction, hideBackdrop, 
 
     const actions = [
         { id: 'cooked' as const, label: t.actions.clear, color: 'text-[var(--color-green)]', bg: 'bg-[var(--bg-tag-green)]', icon: <path d="M20 6L9 17l-5-5" /> },
-        { id: 'todo' as const, label: t.actions.todo, color: 'text-[var(--color-blue)]', bg: 'bg-[var(--bg-tag-blue)]', icon: <circle cx="12" cy="12" r="10" /> },
-        { id: 'frozen' as const, label: t.actions.stash, color: 'text-[var(--color-purple)]', bg: 'bg-[var(--bg-tag-purple)]', icon: <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /> },
+        { id: 'todo' as const, label: t.actions.todo, color: 'text-[var(--color-blue)]', bg: 'bg-[var(--bg-tag-blue)]', icon: <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99z" /> },
+        { id: 'frozen' as const, label: t.actions.stash, color: 'text-[var(--color-purple)]', bg: 'bg-[var(--bg-tag-purple)]', icon: <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /> },
         { id: 'composted' as const, label: t.actions.void, color: 'text-[var(--color-red)]', bg: 'bg-[var(--bg-tag-gray)]', icon: <path d="M18 6L6 18M6 6l12 12" />, isRed: true },
     ].filter(a => a.id !== excludeAction);
 
