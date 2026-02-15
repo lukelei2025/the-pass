@@ -56,6 +56,7 @@ interface StoreState {
   initializeForUser: (userId: string) => Promise<void>;
 
   // 工具方法
+  cleanupOldHistory: (retentionHours: number) => Promise<void>;
   checkExpired: () => Promise<void>;
   checkDailyClearance: () => Promise<void>;
   exportData: () => Promise<string>;
@@ -194,7 +195,7 @@ export const useStore = create<StoreState>()(
         }
       },
 
-      // 清空历史记录
+      // 清空历史记录 (Manual clear all)
       clearHistory: async () => {
         const { userId, items } = get();
         const historyItems = items.filter(item =>
@@ -211,6 +212,42 @@ export const useStore = create<StoreState>()(
           }
           set((state) => ({
             items: state.items.filter((i) => i.status === 'pending'),
+          }));
+        }
+      },
+
+      // 自动清理过期历史 (Auto cleanup > 48h)
+      cleanupOldHistory: async (retentionHours: number) => {
+        const { userId, items } = get();
+        const now = Date.now();
+        const retentionMs = retentionHours * 60 * 60 * 1000;
+
+        // Filter items to DELETE:
+        // 1. Status is in ['cooked', 'todo', 'composted', 'expired'] (NOT 'frozen')
+        // 2. Time (processedAt or createdAt) is older than retention period
+        const itemsToDelete = items.filter(item => {
+          if (item.status === 'frozen' || item.status === 'pending') return false; // Preserve frozen and pending
+
+          if (['cooked', 'todo', 'composted', 'expired'].includes(item.status)) {
+            const time = item.processedAt || item.createdAt;
+            return (now - time) > retentionMs;
+          }
+          return false;
+        });
+
+        if (itemsToDelete.length === 0) return;
+
+        console.log(`Auto-cleaning ${itemsToDelete.length} old history items...`);
+
+        if (userId) {
+          await firestoreService.deleteItems(userId, itemsToDelete.map(i => i.id));
+        } else {
+          for (const item of itemsToDelete) {
+            await itemsStore.removeItem(item.id);
+          }
+          const deletedIds = new Set(itemsToDelete.map(i => i.id));
+          set((state) => ({
+            items: state.items.filter((i) => !deletedIds.has(i.id)),
           }));
         }
       },

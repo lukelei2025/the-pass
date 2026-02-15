@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { copyToClipboard, generateTodoistFormat, generateNotionFormat, mapCategory } from '../lib/constants';
+import { mapCategory } from '../lib/constants';
 import { getUrgencyIndicatorColor } from '../lib/styles/categoryStyles';
 import type { Item, Urgency } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
@@ -8,6 +8,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 
 import ActionDrawer from './ActionDrawer';
 import CategoryTag from './ui/CategoryTag';
+import TodoEditorDialog from './TodoEditorDialog';
 
 interface ItemCardProps {
   item: Item;
@@ -18,27 +19,58 @@ interface ItemCardProps {
 export default function ItemCard({ item, urgency, remainingText }: ItemCardProps) {
   const { updateItem } = useStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editTargetStatus, setEditTargetStatus] = useState<Item['status'] | undefined>(undefined);
   const safeCategory = mapCategory(item.category);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
   const indicatorColor = getUrgencyIndicatorColor(urgency);
+  const isTodo = item.status === 'todo';
 
   const handleAction = async (action: 'cooked' | 'todo' | 'frozen' | 'composted') => {
-    let copied = false;
-    if (action === 'todo') {
-      copied = await copyToClipboard(generateTodoistFormat(item.content, safeCategory));
-    } else if (action === 'frozen') {
-      copied = await copyToClipboard(generateNotionFormat(item.content, safeCategory, item.source));
+    // Special handling for Todo/Frozen: Open editor instead of immediate update
+    if (action === 'todo' || action === 'frozen') {
+      setEditTargetStatus(action);
+      setIsEditorOpen(true);
+      return;
     }
+
     await updateItem(item.id, { status: action, processedAt: Date.now() });
-    if (copied) alert(t.item.copied);
+  };
+
+  const handleCardClick = () => {
+    if (isTodo) {
+      setIsEditorOpen(true);
+    } else if (isMobile) {
+      setIsDrawerOpen(true);
+    }
+  };
+
+  const getDeadlineColor = (timestamp: number) => {
+    const now = Date.now();
+    const diff = timestamp - now;
+
+    if (diff < 0) return 'text-[var(--color-red)] bg-red-50'; // Overdue
+    if (diff < 24 * 60 * 60 * 1000) return 'text-[var(--color-orange)] bg-orange-50'; // < 24h
+    return 'text-[var(--color-green)] bg-green-50'; // > 24h
+  };
+
+  const formatDeadline = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString(undefined, {
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
   };
 
   return (
     <div
-      onClick={() => isMobile && setIsDrawerOpen(true)}
-      className="group flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-200 relative overflow-hidden cursor-pointer md:cursor-default"
+      onClick={handleCardClick}
+      className={`group flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[10px] p-4 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-200 relative overflow-hidden cursor-pointer ${!isTodo && !isMobile ? 'md:cursor-default' : ''}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -56,10 +88,19 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         </div>
 
         {/* Time with Indicator */}
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-ink-secondary)]">
-          <span className={`w-1.5 h-1.5 rounded-full ${indicatorColor}`} />
-          {remainingText}
-        </div>
+        {isTodo ? (
+          item.deadline ? (
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded ${getDeadlineColor(item.deadline)}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              {formatDeadline(item.deadline)}
+            </div>
+          ) : null
+        ) : (
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-ink-secondary)]">
+            <span className={`w-1.5 h-1.5 rounded-full ${indicatorColor}`} />
+            {remainingText}
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -71,7 +112,7 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="hover:text-[var(--color-accent)] transition-colors block group/link"
+              className="hover:text-[var(--color-accent)] transition-colors w-fit group/link"
             >
               <p className="text-[14px] leading-relaxed font-medium line-clamp-3">
                 {item.title || item.content}
@@ -89,6 +130,15 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
             {item.content}
           </p>
         )}
+
+        {/* Todo Details */}
+        {isTodo && item.details && (
+          <div className="mt-3 pt-3 border-t border-dashed border-[var(--color-border)]">
+            <p className="text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap">
+              {item.details}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Source Link Subtle */}
@@ -100,15 +150,18 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
       )}
 
       {/* Desktop Hover Actions */}
-      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-[var(--color-border)] opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{padding: 0}}>
+      <div className="hidden md:flex absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-[var(--color-border)] opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ padding: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); handleAction('cooked'); }} title={`${t.actions.clear} (Cmd+Enter)`} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-green)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
           <span className="text-[13px] font-semibold">{t.actions.clear}</span>
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title={t.actions.todo} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
-          <span className="text-[13px] font-semibold">{t.actions.todo}</span>
-        </button>
+        {/* Only show 'Todo' button if NOT already in todo */}
+        {!isTodo && (
+          <button onClick={(e) => { e.stopPropagation(); handleAction('todo'); }} title={t.actions.todo} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /></svg>
+            <span className="text-[13px] font-semibold">{t.actions.todo}</span>
+          </button>
+        )}
         <button onClick={(e) => { e.stopPropagation(); handleAction('frozen'); }} title={t.actions.stash} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-blue)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" /></svg>
           <span className="text-[13px] font-semibold">{t.actions.stash}</span>
@@ -116,16 +169,28 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         <button onClick={(e) => { e.stopPropagation(); handleAction('composted'); }} title={t.actions.void} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-red)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
           <span className="text-[13px] font-semibold">{t.actions.void}</span>
-
         </button>
       </div>
 
-      {/* Mobile Bottom Sheet */}
-      <ActionDrawer
+      {/* Mobile Bottom Sheet (Only for non-Todo items) */}
+      {!isTodo && (
+        <ActionDrawer
+          item={item}
+          isOpen={isDrawerOpen}
+          onClose={() => setIsDrawerOpen(false)}
+          onAction={handleAction}
+        />
+      )}
+
+      {/* Todo Editor Dialog */}
+      <TodoEditorDialog
         item={item}
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        onAction={handleAction}
+        isOpen={isEditorOpen}
+        onClose={() => {
+          setIsEditorOpen(false);
+          setEditTargetStatus(undefined);
+        }}
+        newStatus={editTargetStatus}
       />
     </div>
   );

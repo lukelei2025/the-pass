@@ -78,18 +78,32 @@ export const zh: Locale = {
         allClear: '全部清空',
     },
     menu: {
-        title: '待办清单',
+        title: '待办',
         empty: '暂无待办事项。干得好！',
     },
     freezer: {
-        title: '收藏夹',
+        title: '收藏',
         empty: '收藏夹是空的。',
     },
     history: {
-        title: '历史记录',
+        title: '记录',
         empty: '暂无历史记录。',
         clearHistory: '清空历史',
         records: '条记录',
+        action: '动作',
+        category: '分类',
+        content: '内容',
+        date: '时间',
+        stats: {
+            cumulativeZaps: '累计乱入',
+            cumulativeProcessed: '累计处理',
+            processRate: '处理比例',
+            cumulativeTodos: '累计待办',
+            completedTodos: '完成待办',
+            completionRate: '完成比例',
+            stashed: '已收藏',
+        },
+        recentRecords: '48小时内记录',
     },
     item: {
         linkMetadata: '已识别链接元数据',
@@ -100,6 +114,24 @@ export const zh: Locale = {
         noNote: '无笔记。点击添加...',
         copyNotion: '复制 Notion',
         editNote: '编辑笔记',
+    },
+
+    // Todo Editor
+    todoEditor: {
+        editTodo: '编辑待办',
+        editCollection: '编辑项目',
+        stashToCollection: '加入收藏',
+        deadline: '截止日期',
+        details: '详情',
+        addNote: '添加笔记（可选）',
+        placeholderDetails: '添加详情、笔记或子任务...',
+        placeholderStash: '添加想法、标签或上下文...',
+        saveDetails: '保存详情',
+        stashItem: '加入收藏',
+        cancel: '取消',
+        tags: '标签',
+        addTag: '添加标签 +',
+        tagPlaceholder: '输入并回车...',
     },
 
     // Category Selector

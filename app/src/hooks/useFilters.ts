@@ -8,6 +8,7 @@ export interface FilterState {
   searchQuery: string;
   selectedCategories: Set<Category>;
   selectedSources: Set<string>;
+  selectedTags: Set<string>;
 }
 
 /**
@@ -33,6 +34,7 @@ export function useFilters<T extends Item>(
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<Category>>(new Set());
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   // 动态提取所有出现过的分类
   const availableCategories = useMemo(() => {
@@ -54,16 +56,31 @@ export function useFilters<T extends Item>(
     return Array.from(sources).sort();
   }, [items]);
 
+  // 动态提取所有出现过的自定义标签
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    items.forEach(item => {
+      if (item.tags && item.tags.length > 0) {
+        item.tags.forEach(tag => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
+  }, [items]);
+
   // 默认筛选逻辑
-  const defaultFilter = useCallback((item: T, filters: FilterState) => {
-    const { searchQuery: q, selectedCategories: cats, selectedSources: srcs } = filters;
+  const defaultFilter = useCallback((item: T, filters: FilterState & { selectedTags: Set<string> }) => {
+    const { searchQuery: q, selectedCategories: cats, selectedSources: srcs, selectedTags: tags } = filters;
 
     // 搜索逻辑
     if (q) {
       const query = q.toLowerCase();
       const matchContent = item.content.toLowerCase().includes(query);
       const matchSource = item.source?.toLowerCase().includes(query) || false;
-      if (!matchContent && !matchSource) return false;
+      const matchTitle = item.title?.toLowerCase().includes(query) || false;
+      const matchDetails = item.details?.toLowerCase().includes(query) || false;
+      const matchTags = item.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+
+      if (!matchContent && !matchSource && !matchTitle && !matchDetails && !matchTags) return false;
     }
 
     // 分类筛选
@@ -76,19 +93,26 @@ export function useFilters<T extends Item>(
       if (!item.source || !srcs.has(item.source)) return false;
     }
 
+    // 自定义标签筛选 (选中任意一个标签即可 - 或者 strict logic? 通常是 OR logic within tags, but AND across types)
+    // Here we use: if any filtered tag exists in item.tags
+    if (tags.size > 0) {
+      if (!item.tags || !item.tags.some(tag => tags.has(tag))) return false;
+    }
+
     return true;
   }, []);
 
   // 应用筛选
   const filteredItems = useMemo(() => {
-    const filters: FilterState = {
+    const filters = {
       searchQuery,
       selectedCategories,
       selectedSources,
+      selectedTags,
     };
 
-    return items.filter(item => (filterFn || defaultFilter)(item, filters));
-  }, [items, searchQuery, selectedCategories, selectedSources, filterFn, defaultFilter]);
+    return items.filter(item => (filterFn || defaultFilter)(item, filters as any));
+  }, [items, searchQuery, selectedCategories, selectedSources, selectedTags, filterFn, defaultFilter]);
 
   // 切换分类选中状态
   const toggleCategory = useCallback((cat: Category) => {
@@ -116,18 +140,33 @@ export function useFilters<T extends Item>(
     });
   }, []);
 
+  // 切换自定义标签选中状态
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  }, []);
+
   // 清除所有筛选
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedCategories(new Set());
     setSelectedSources(new Set());
+    setSelectedTags(new Set());
   }, []);
 
   // 检查是否有活动筛选
   const hasActiveFilters = !!(
     searchQuery ||
     selectedCategories.size > 0 ||
-    selectedSources.size > 0
+    selectedSources.size > 0 ||
+    selectedTags.size > 0
   );
 
   return {
@@ -135,15 +174,18 @@ export function useFilters<T extends Item>(
     searchQuery,
     selectedCategories,
     selectedSources,
+    selectedTags,
     filteredItems,
     availableCategories,
     availableSources,
+    availableTags,
     hasActiveFilters,
 
     // 操作方法
     setSearchQuery,
     toggleCategory,
     toggleSource,
+    toggleTag,
     clearAllFilters,
   };
 }

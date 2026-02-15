@@ -88,6 +88,20 @@ export const en = {
         empty: 'No history yet.',
         clearHistory: 'Clear History',
         records: 'records',
+        action: 'Action',
+        category: 'Category',
+        content: 'Content',
+        date: 'Date',
+        stats: {
+            cumulativeZaps: 'Total Zaps',
+            cumulativeProcessed: 'Processed',
+            processRate: 'Process Rate',
+            cumulativeTodos: 'Total Todos',
+            completedTodos: 'Completed',
+            completionRate: 'Completion Rate',
+            stashed: 'Stashed',
+        },
+        recentRecords: 'Records (48h)',
     },
     item: {
         linkMetadata: 'Link metadata identified',
@@ -98,6 +112,24 @@ export const en = {
         noNote: 'No note. Click to add...',
         copyNotion: 'Copy Notion',
         editNote: 'Edit Note',
+    },
+
+    // Todo Editor
+    todoEditor: {
+        editTodo: 'Edit Todo',
+        editCollection: 'Edit Item',
+        stashToCollection: 'Stash to Collection',
+        deadline: 'Deadline',
+        details: 'Details',
+        addNote: 'Add Note (Optional)',
+        placeholderDetails: 'Add details, notes, or subtasks...',
+        placeholderStash: 'Add thoughts, tags, or context...',
+        saveDetails: 'Save Details',
+        stashItem: 'Stash Item',
+        cancel: 'Cancel',
+        tags: 'Tags',
+        addTag: 'Add tag +',
+        tagPlaceholder: 'Type and enter...',
     },
 
     // Category Selector

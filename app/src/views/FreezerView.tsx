@@ -4,7 +4,9 @@ import ListItem from '../components/ListItem';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFilters } from '../hooks/useFilters';
 import SearchBar from '../components/ui/SearchBar';
-import { CategoryFilterPills, SourceFilterPills, ClearFiltersButton } from '../components/ui/FilterPills';
+import FilterPill, { ClearFiltersButton } from '../components/ui/FilterPills';
+import { getCategoryPillStyle } from '../lib/styles/categoryStyles';
+import { cn } from '../lib/utils';
 
 export default function FreezerView() {
   const { items } = useStore();
@@ -23,13 +25,16 @@ export default function FreezerView() {
     searchQuery,
     selectedCategories,
     selectedSources,
+    selectedTags,
     filteredItems,
     availableCategories,
     availableSources,
+    availableTags,
     hasActiveFilters,
     setSearchQuery,
     toggleCategory,
     toggleSource,
+    toggleTag,
     clearAllFilters,
   } = useFilters(frozenItems);
 
@@ -51,24 +56,52 @@ export default function FreezerView() {
       />
 
       {/* Filters */}
-      {(availableCategories.length > 0 || availableSources.length > 0) && (
-        <div className="space-y-2">
-          <CategoryFilterPills
-            categories={availableCategories}
-            selectedCategories={selectedCategories}
-            onToggleCategory={toggleCategory}
-            getCategoryLabel={(cat) => t.categories[cat]}
-          />
+      {(availableCategories.length > 0 || availableSources.length > 0 || availableTags.length > 0) && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Categories */}
+          {availableCategories.map((category) => (
+            <button
+              key={category}
+              onClick={() => toggleCategory(category)}
+              className={cn(
+                'px-3 py-1 rounded-full text-[12px] font-semibold transition-all duration-150 cursor-pointer',
+                getCategoryPillStyle(category, selectedCategories.has(category))
+              )}
+            >
+              {t.categories[category]}
+            </button>
+          ))}
 
-          <SourceFilterPills
-            sources={availableSources}
-            selectedSources={selectedSources}
-            onToggleSource={toggleSource}
-          />
+          {/* Sources */}
+          {availableSources.map((source) => (
+            <FilterPill
+              key={source}
+              selected={selectedSources.has(source)}
+              onClick={() => toggleSource(source)}
+            >
+              {source}
+            </FilterPill>
+          ))}
+
+          {/* Custom Tags */}
+          {availableTags.map((tag) => (
+            <FilterPill
+              key={`tag-${tag}`}
+              selected={selectedTags.has(tag)}
+              onClick={() => toggleTag(tag)}
+              className={cn(
+                selectedTags.has(tag)
+                  ? 'bg-[var(--color-accent)] text-white'
+                  : 'text-[var(--color-accent)] bg-[var(--color-accent)]/5 hover:bg-[var(--color-accent)]/10'
+              )}
+            >
+              #{tag}
+            </FilterPill>
+          ))}
 
           {hasActiveFilters && (
             <ClearFiltersButton onClick={clearAllFilters}>
-              Clear all filters
+              Clear all checks
             </ClearFiltersButton>
           )}
         </div>

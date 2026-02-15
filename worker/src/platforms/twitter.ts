@@ -43,38 +43,65 @@ export class TwitterPlatform extends BasePlatform {
     }
 
     private async fetchWithJina(url: string, env: Env): Promise<TitleResult> {
-        try {
-            const cleanUrl = url.replace(/^https?:\/\//, '');
-            const apiUrl = `https://r.jina.ai/http://${cleanUrl}`;
-            const headers: Record<string, string> = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            };
-            if (env.JINA_API_KEY) {
-                headers['Authorization'] = `Bearer ${env.JINA_API_KEY}`;
-            }
-
-            const response = await fetch(apiUrl, {
-                headers,
-                signal: AbortSignal.timeout(15000),
-            } as any);
-
-            if (!response.ok) {
-                return { title: null, author: '', method: 'twitter_jina', error: `Jina HTTP ${response.status}` };
-            }
-
-            const content = await response.text();
-            const { title, author } = this.parseJinaTweet(content);
-            if (!title && !author) {
-                return { title: null, author: '', method: 'twitter_jina', error: 'Jina parse failed' };
-            }
-
-            return { title: title || null, author: author || '', method: 'twitter_jina' };
-        } catch (error: any) {
-            if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-                return { title: null, author: '', method: 'twitter_jina', error: 'Jina timeout' };
-            }
-            return { title: null, author: '', method: 'twitter_jina', error: 'Jina request failed' };
+        const cleanUrl = url.replace(/^https?:\/\//, '');
+        const apiUrl = `https://r.jina.ai/http://${cleanUrl}`;
+        const headers: Record<string, string> = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        };
+        if (env.JINA_API_KEY) {
+            headers['Authorization'] = `Bearer ${env.JINA_API_KEY}`;
         }
+
+        let lastError = '';
+        const maxRetries = 2; // Try up to 2 times
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Determine timeout: 15s for first attempt, slightly longer for retry
+                const timeoutMs = attempt === 1 ? 15000 : 20000;
+
+                const response = await fetch(apiUrl, {
+                    headers,
+                    signal: AbortSignal.timeout(timeoutMs),
+                } as any);
+
+                if (!response.ok) {
+                    lastError = `Jina HTTP ${response.status}`;
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s before retry
+                        continue;
+                    }
+                    return { title: null, author: '', method: 'twitter_jina', error: lastError };
+                }
+
+                const content = await response.text();
+                const { title, author } = this.parseJinaTweet(content);
+
+                if (!title && !author) {
+                    lastError = 'Jina parse failed (empty content)';
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        continue;
+                    }
+                    return { title: null, author: '', method: 'twitter_jina', error: lastError };
+                }
+
+                return { title: title || null, author: author || '', method: 'twitter_jina' };
+            } catch (error: any) {
+                if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+                    lastError = 'Jina timeout';
+                } else {
+                    lastError = `Jina request failed: ${error.message}`;
+                }
+
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    continue;
+                }
+            }
+        }
+
+        return { title: null, author: '', method: 'twitter_jina', error: lastError || 'Max retries exceeded' };
     }
 
     private parseJinaTweet(content: string): { title: string | null; author: string | null } {
