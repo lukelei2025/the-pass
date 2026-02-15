@@ -182,7 +182,6 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         isOpen={isDrawerOpen}
         onClose={() => {
           setIsDrawerOpen(false);
-          setIsEditorOpen(false);
         }}
         onAction={handleAction}
         hideBackdrop={isTodo && isMobile && isEditorOpen}
