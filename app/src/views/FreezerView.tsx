@@ -6,6 +6,7 @@ import { useFilters } from '../hooks/useFilters';
 import SearchBar from '../components/ui/SearchBar';
 import FilterPill, { ClearFiltersButton } from '../components/ui/FilterPills';
 import { getCategoryPillStyle } from '../lib/styles/categoryStyles';
+import { exportItemsToCSV } from '../lib/exportCSV';
 import { cn } from '../lib/utils';
 
 export default function FreezerView() {
@@ -43,9 +44,24 @@ export default function FreezerView() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
         <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.freezer.title}</h2>
-        <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
-          {filteredItems.length}{hasActiveFilters ? ` / ${frozenItems.length}` : ''} items
-        </span>
+        <div className="flex items-center gap-3">
+          {filteredItems.length > 0 && (
+            <button
+              onClick={() => exportItemsToCSV(filteredItems, t.categories)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[12px] font-medium text-[var(--color-accent)] bg-[var(--color-accent)]/5 hover:bg-[var(--color-accent)]/10 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {t.freezer.exportExcel}
+            </button>
+          )}
+          <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
+            {filteredItems.length}{hasActiveFilters ? ` / ${frozenItems.length}` : ''} items
+          </span>
+        </div>
       </div>
 
       {/* Search Bar */}

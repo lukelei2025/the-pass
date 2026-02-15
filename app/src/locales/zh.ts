@@ -84,6 +84,7 @@ export const zh: Locale = {
     freezer: {
         title: '收藏',
         empty: '收藏夹是空的。',
+        exportExcel: '导出',
     },
     history: {
         title: '记录',
@@ -145,7 +146,7 @@ export const zh: Locale = {
 
     // Login
     login: {
-        subtitle: '你的数字工作台，捕捉、分类、管理信息流。',
+        subtitle: '你的即时工作台，捕捉你随时随地产生或接收到的灵感、备忘和内容链接',
         google: '使用 Google 登录',
         or: '或',
         emailPlaceholder: '输入你的邮箱',

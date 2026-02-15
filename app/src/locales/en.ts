@@ -82,6 +82,7 @@ export const en = {
     freezer: {
         title: 'Stash',
         empty: 'Nothing in stash.',
+        exportExcel: 'Export',
     },
     history: {
         title: 'Traces',
@@ -143,7 +144,7 @@ export const en = {
 
     // Login
     login: {
-        subtitle: 'Your digital workbench for capturing, classifying, and managing information flow.',
+        subtitle: 'Your instant workbench for capturing inspirations, memos, and content links — anytime, anywhere.',
         google: 'Sign in with Google',
         or: 'or',
         emailPlaceholder: 'Enter your email',
