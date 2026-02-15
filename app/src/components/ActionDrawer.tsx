@@ -43,7 +43,11 @@ export default function ActionDrawer({ isOpen, onClose, onAction, hideBackdrop, 
                     {actions.map(action => (
                         <button
                             key={action.id}
-                            onClick={() => { onAction(action.id); onClose(); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAction(action.id);
+                                onClose();
+                            }}
                             className="flex flex-col items-center gap-1.5"
                         >
                             <div className={`w-10 h-10 rounded-full ${action.bg} flex items-center justify-center ${action.color}`}>
