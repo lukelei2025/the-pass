@@ -49,12 +49,18 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
     const getMenuPosition = () => {
         if (!buttonRef.current) return {};
         const rect = buttonRef.current.getBoundingClientRect();
+        const menuWidth = 192; // w-48 = 12rem = 192px
 
         // 移动端 (宽 < 768px)：向下弹出
         if (window.innerWidth < 768) {
+            // 如果左侧定位会导致溢出，则右对齐
+            const left = rect.left + menuWidth > window.innerWidth
+                ? window.innerWidth - menuWidth - 12 // 12px margin from edge
+                : rect.left;
+
             return {
                 position: 'fixed' as const,
-                left: `${rect.left}px`,
+                left: `${left}px`,
                 top: `${rect.bottom + 8}px`, // 向下
             };
         }
