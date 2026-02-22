@@ -13,7 +13,7 @@ import LoginPage from './views/LoginPage';
 import UserAvatarMenu from './components/UserAvatarMenu';
 
 function AppContent() {
-  const { currentView, checkExpired, setCurrentView, initializeForUser, resetStats } = useStore();
+  const { currentView, checkExpired, setCurrentView, initializeForUser } = useStore();
   const { user, loading } = useAuth();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
@@ -30,25 +30,7 @@ function AppContent() {
     }
   }, [user, initializeForUser]);
 
-  // TEMPORARY: One-time stats reset (remove after deployment)
-  useEffect(() => {
-    if (user && !localStorage.getItem('stats_reset_v2')) {
-      // Delay to ensure initializeForUser + loadStats has completed first
-      const timer = setTimeout(() => {
-        resetStats({
-          totalZaps: 6,
-          totalProcessed: 0,
-          totalTodos: 0,
-          completedTodos: 0,
-          totalStashed: 5,
-        }).then(() => {
-          localStorage.setItem('stats_reset_v2', 'done');
-          console.log('[Stats] Reset complete');
-        });
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [user, resetStats]);
+
 
   // Check expired items periodically
   useEffect(() => {
