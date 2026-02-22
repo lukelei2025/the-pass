@@ -4,7 +4,7 @@
  */
 
 import type { Category } from '../types';
-import { API_ENDPOINTS, buildWorkerUrl, REQUEST_TIMEOUT } from '../config/api';
+import { API_ENDPOINTS, buildWorkerUrl, REQUEST_TIMEOUT, RETRY_CONFIG } from '../config/api';
 import { extractUrl, validateCategory } from './processors/contentProcessor';
 
 
@@ -78,6 +78,53 @@ export function identifyPlatform(url: string): { name: string; category: Categor
 }
 
 /**
+ * 带重试机制的 fetch 请求
+ * 用于应对 Cloudflare Worker 冷启动导致的首次请求失败
+ */
+async function fetchWithRetry(
+    url: string,
+    options: RequestInit = {},
+    config: { maxAttempts?: number; backoffMs?: number; timeoutMs?: number } = {}
+): Promise<Response> {
+    const maxAttempts = config.maxAttempts ?? RETRY_CONFIG.maxAttempts;
+    const backoffMs = config.backoffMs ?? RETRY_CONFIG.backoffMs;
+    const timeoutMs = config.timeoutMs ?? REQUEST_TIMEOUT.default;
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            // 5xx 服务端错误时重试，其余状态直接返回
+            if (response.status >= 500 && attempt < maxAttempts) {
+                console.warn(`[fetchWithRetry] Attempt ${attempt}/${maxAttempts} got ${response.status}, retrying...`);
+                await new Promise(r => setTimeout(r, backoffMs * attempt));
+                continue;
+            }
+
+            return response;
+        } catch (err: any) {
+            lastError = err;
+            console.warn(`[fetchWithRetry] Attempt ${attempt}/${maxAttempts} failed:`, err.message || err);
+
+            if (attempt < maxAttempts) {
+                await new Promise(r => setTimeout(r, backoffMs * attempt));
+            }
+        }
+    }
+
+    throw lastError || new Error('fetchWithRetry: all attempts failed');
+}
+
+/**
  * 尝试获取网页标题
  * 统一返回格式：标题 #作者（优先）/平台（兜底）
  */
@@ -88,10 +135,7 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
     if (isWeChat) {
         const wechatWorkerUrl = buildWorkerUrl(API_ENDPOINTS.wechatWorker, { url });
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            const response = await fetch(wechatWorkerUrl, { signal: controller.signal });
-            clearTimeout(timeoutId);
+            const response = await fetchWithRetry(wechatWorkerUrl, {}, { timeoutMs });
 
             if (response.ok) {
                 const data = await response.json();
@@ -103,7 +147,7 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
                 }
             }
         } catch (err) {
-            console.warn('[WeChat Worker] 请求失败:', err);
+            console.warn('[WeChat Worker] 请求失败（已重试）:', err);
         }
     }
 
@@ -111,11 +155,7 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
     const workerUrl = buildWorkerUrl(API_ENDPOINTS.titleProxy, { url });
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-        const response = await fetch(workerUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
+        const response = await fetchWithRetry(workerUrl, {}, { timeoutMs });
 
         if (response.ok) {
             const data = await response.json();
@@ -134,7 +174,7 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
             }
         }
     } catch (err) {
-        console.warn(`[Worker请求失败]: ${workerUrl}`, err);
+        console.warn(`[Worker请求失败（已重试）]: ${workerUrl}`, err);
     }
 
     return null;
@@ -233,18 +273,22 @@ export async function classifyContent(
         return { category: isLink ? 'external' : 'others', metadata, success: false, disabled: true };
     }
 
-    // 4. 调用 Cloudflare Worker (Classify)
+    // 4. 调用 Cloudflare Worker (Classify)，带重试机制
     try {
-        const response = await fetch(API_ENDPOINTS.classifyWorker, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        const response = await fetchWithRetry(
+            API_ENDPOINTS.classifyWorker,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content,
+                    metadata
+                }),
             },
-            body: JSON.stringify({
-                content,
-                metadata
-            }),
-        });
+            { timeoutMs: REQUEST_TIMEOUT.default }
+        );
 
         if (!response.ok) {
             console.error('Worker Classify Failed:', response.status);
@@ -261,7 +305,7 @@ export async function classifyContent(
         return { category: isLink ? 'external' : 'others', metadata, success: false };
 
     } catch (error) {
-        console.error('Worker Call Failed:', error);
+        console.error('Worker Call Failed (已重试):', error);
         // 检查是否是网络错误（离线）
         const isOffline = error instanceof TypeError && error.message.includes('fetch');
         return { category: isLink ? 'external' : 'others', metadata, success: false, offline: isOffline };
