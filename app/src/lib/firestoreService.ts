@@ -211,3 +211,13 @@ export async function incrementStats(
         }
     }
 }
+
+/**
+ * Overwrite stats with specific values (for manual reset).
+ */
+export async function resetStats(
+    userId: string,
+    stats: UserStats
+): Promise<void> {
+    await setDoc(getUserStatsDoc(userId), stats);
+}

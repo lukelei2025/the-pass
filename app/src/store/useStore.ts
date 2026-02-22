@@ -67,6 +67,7 @@ interface StoreState {
 
   // Stats
   loadStats: () => Promise<void>;
+  resetStats: (stats: UserStats) => Promise<void>;
 
   // 工具方法
   cleanupOldHistory: (retentionHours: number) => Promise<void>;
@@ -173,6 +174,14 @@ export const useStore = create<StoreState>()(
         } catch (error) {
           console.error('Failed to load stats:', error);
         }
+      },
+
+      // Reset stats to specific values
+      resetStats: async (newStats) => {
+        const { userId } = get();
+        if (!userId) return;
+        await firestoreService.resetStats(userId, newStats);
+        set({ stats: newStats });
       },
 
       // 添加卡片
