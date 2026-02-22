@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 
 /**
@@ -48,6 +48,16 @@ const app = initializeApp(firebaseConfig);
 // Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// 🔒 确保 Auth 持久化使用 IndexedDB (browserLocalPersistence)
+// 在初始化时设置，而不是仅在登录时设置，防止 PWA 关闭后丢失登录状态
+export const authPersistenceReady = setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+        console.log('[Firebase] ✅ Auth persistence set to browserLocalPersistence (IndexedDB)');
+    })
+    .catch((error) => {
+        console.error('[Firebase] ❌ Failed to set auth persistence:', error);
+    });
 
 // Firestore with offline persistence using new API
 // 使用 persistentLocalCache 替代已弃用的 enableIndexedDbPersistence
