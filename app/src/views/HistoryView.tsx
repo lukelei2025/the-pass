@@ -135,6 +135,7 @@ export default function HistoryView() {
                     <th className="px-4 py-3 font-normal w-24">{t.history.category}</th>
                     <th className="px-4 py-3 font-normal">{t.history.content}</th>
                     <th className="px-4 py-3 font-normal w-32 text-right">{t.history.date}</th>
+                    <th className="w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,19 +154,20 @@ export default function HistoryView() {
                         <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-sm" title={item.content}>
                           {item.title || item.content}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-[var(--color-ink-tertiary)] font-mono">
-                              {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
-                            </span>
-                            <button
-                              onClick={() => restoreItem(item.id)}
-                              title={t.actions.restore}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-md text-[11px] font-semibold text-[var(--color-green)] hover:bg-[rgba(5,150,105,0.1)]"
-                            >
-                              {t.actions.restore}
-                            </button>
-                          </div>
+                        <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono whitespace-nowrap">
+                          {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="pr-3 py-3">
+                          <button
+                            onClick={() => restoreItem(item.id)}
+                            title={t.actions.restore}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-[var(--color-ink-tertiary)] hover:text-[var(--color-green)] hover:bg-[rgba(5,150,105,0.08)]"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="1 4 1 10 7 10" />
+                              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                     );
