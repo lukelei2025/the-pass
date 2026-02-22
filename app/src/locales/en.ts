@@ -27,6 +27,7 @@ export const en = {
         todo: 'To-do',
         stash: 'Stash',
         void: 'Void',
+        expired: 'Expired',
     },
 
     // Common

@@ -28,7 +28,7 @@ export default function HistoryView() {
     todo: t.actions.todo,
     frozen: t.actions.stash,
     composted: t.actions.void,
-    expired: 'Expired',
+    expired: t.actions.expired,
   };
 
   return (

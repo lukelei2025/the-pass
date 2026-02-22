@@ -364,7 +364,7 @@ export const useStore = create<StoreState>()(
 
         for (const item of pendingItems) {
           if (item.expiresAt < now) {
-            await get().updateItem(item.id, { status: 'expired' });
+            await get().updateItem(item.id, { status: 'expired', processedAt: now });
           }
         }
       },
@@ -388,8 +388,9 @@ export const useStore = create<StoreState>()(
 
         if (now > clearanceTimeToday) {
           const pendingItems = items.filter((item) => item.status === 'pending');
+          const clearTime = Date.now();
           for (const item of pendingItems) {
-            await get().updateItem(item.id, { status: 'expired' });
+            await get().updateItem(item.id, { status: 'expired', processedAt: clearTime });
           }
         }
       },

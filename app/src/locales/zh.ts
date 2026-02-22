@@ -28,6 +28,7 @@ export const zh: Locale = {
         todo: '待办',
         stash: '收藏',
         void: '删除',
+        expired: '过期',
     },
 
     // Common
