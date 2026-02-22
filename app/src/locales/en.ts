@@ -28,6 +28,7 @@ export const en = {
         stash: 'Stash',
         void: 'Void',
         expired: 'Expired',
+        restore: 'Restore',
     },
 
     // Common

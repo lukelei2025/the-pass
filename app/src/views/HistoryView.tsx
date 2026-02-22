@@ -3,9 +3,10 @@ import { useStore } from '../store/useStore';
 import { mapCategory } from '../lib/constants';
 import { useTranslation } from '../hooks/useTranslation';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import SwipeableHistoryRow from '../components/SwipeableHistoryRow';
 
 export default function HistoryView() {
-  const { items, cleanupOldHistory, stats, loadStats } = useStore();
+  const { items, cleanupOldHistory, stats, loadStats, restoreItem } = useStore();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
@@ -93,8 +94,8 @@ export default function HistoryView() {
               <div className="divide-y divide-[var(--color-border)]">
                 {processedItems.map((item) => {
                   const safeCategory = mapCategory(item.category);
-                  return (
-                    <div key={item.id} className="p-3.5 space-y-1.5 hover:bg-[var(--color-surface-hover)] transition-colors">
+                  const rowContent = (
+                    <div className="p-3.5 space-y-1.5 hover:bg-[var(--color-surface-hover)] transition-colors">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-bold text-[var(--color-ink-secondary)] uppercase tracking-wider">
@@ -113,6 +114,16 @@ export default function HistoryView() {
                       </p>
                     </div>
                   );
+
+                  return (
+                    <SwipeableHistoryRow
+                      key={item.id}
+                      onRestore={() => restoreItem(item.id)}
+                      restoreLabel={t.actions.restore}
+                    >
+                      {rowContent}
+                    </SwipeableHistoryRow>
+                  );
                 })}
               </div>
             ) : (
@@ -130,7 +141,7 @@ export default function HistoryView() {
                   {processedItems.map((item) => {
                     const safeCategory = mapCategory(item.category);
                     return (
-                      <tr key={item.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
+                      <tr key={item.id} className="group border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-hover)] transition-colors">
                         <td className="px-4 py-3 text-[var(--color-ink-secondary)] whitespace-nowrap">
                           {statusMap[item.status] || item.status}
                         </td>
@@ -142,8 +153,19 @@ export default function HistoryView() {
                         <td className="px-4 py-3 text-[var(--color-ink)] truncate max-w-sm" title={item.content}>
                           {item.title || item.content}
                         </td>
-                        <td className="px-4 py-3 text-right text-[var(--color-ink-tertiary)] font-mono whitespace-nowrap">
-                          {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-[var(--color-ink-tertiary)] font-mono">
+                              {new Date(item.processedAt || item.createdAt).toLocaleDateString()}
+                            </span>
+                            <button
+                              onClick={() => restoreItem(item.id)}
+                              title={t.actions.restore}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-md text-[11px] font-semibold text-[var(--color-green)] hover:bg-[rgba(5,150,105,0.1)]"
+                            >
+                              {t.actions.restore}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

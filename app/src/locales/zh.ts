@@ -29,6 +29,7 @@ export const zh: Locale = {
         stash: '收藏',
         void: '删除',
         expired: '过期',
+        restore: '恢复',
     },
 
     // Common

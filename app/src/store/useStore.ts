@@ -53,6 +53,7 @@ interface StoreState {
   getItemsByCategory: (category: Category) => Item[];
   getPendingItems: () => Item[];
   getExpiredItems: () => Item[];
+  restoreItem: (id: string) => Promise<void>;
 
   // Settings 操作
   updateSettings: (updates: Partial<Settings>) => Promise<void>;
@@ -336,6 +337,16 @@ export const useStore = create<StoreState>()(
         return get().items.filter(
           (item) => item.status === 'pending' && item.expiresAt < now
         );
+      },
+
+      // 恢复卡片到工作台（从记录页恢复）
+      restoreItem: async (id) => {
+        const { settings } = get();
+        await get().updateItem(id, {
+          status: 'pending',
+          processedAt: undefined,
+          expiresAt: calculateExpireTime(settings.expireHours),
+        });
       },
 
       // 更新设置
