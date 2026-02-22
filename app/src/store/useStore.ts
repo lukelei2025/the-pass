@@ -350,12 +350,17 @@ export const useStore = create<StoreState>()(
 
       // 恢复卡片到工作台（从记录页恢复）
       restoreItem: async (id) => {
-        const { settings } = get();
+        const { settings, userId } = get();
         await get().updateItem(id, {
           status: 'pending',
           processedAt: undefined,
           expiresAt: calculateExpireTime(settings.expireHours),
         });
+        // Increment cumulative zap counter
+        if (userId) {
+          await firestoreService.incrementStats(userId, { totalZaps: 1 });
+          set((state) => ({ stats: { ...state.stats, totalZaps: state.stats.totalZaps + 1 } }));
+        }
       },
 
       // 更新设置
