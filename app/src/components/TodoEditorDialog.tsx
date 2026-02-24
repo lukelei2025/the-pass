@@ -45,7 +45,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                 setDeadlineDate('');
                 setDeadlineTime('');
             }
-            setContent(item.content || '');
+            setContent(item.title || item.content || '');
             setDetails(item.details || '');
             setTags(item.tags || []);
         }
@@ -77,7 +77,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
         }
 
         const updates: Partial<Item> = {
-            content: content.trim() || item.content,
+            content: content.trim() || item.title || item.content,
             deadline: deadlineTimestamp,
             details: details.trim() || null,
             tags: tags.length > 0 ? tags : null,
