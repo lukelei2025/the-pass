@@ -121,6 +121,9 @@ export const zh: Locale = {
 
     // Todo Editor
     todoEditor: {
+        title: '内容 / 标题',
+        titlePlaceholder: '输入内容或标题...',
+        clearDeadline: '清除日期',
         editTodo: '编辑待办',
         editCollection: '编辑项目',
         stashToCollection: '加入收藏',

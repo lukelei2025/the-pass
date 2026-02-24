@@ -17,6 +17,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
     const { updateItem } = useStore();
     const [deadlineDate, setDeadlineDate] = useState('');
     const [deadlineTime, setDeadlineTime] = useState('');
+    const [content, setContent] = useState('');
     const [details, setDetails] = useState('');
     const [tags, setTags] = useState<string[]>([]);
     const [tagInput, setTagInput] = useState('');
@@ -44,6 +45,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                 setDeadlineDate('');
                 setDeadlineTime('');
             }
+            setContent(item.content || '');
             setDetails(item.details || '');
             setTags(item.tags || []);
         }
@@ -75,6 +77,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
         }
 
         const updates: Partial<Item> = {
+            content: content.trim() || item.content,
             deadline: deadlineTimestamp,
             details: details.trim() || undefined,
             tags: tags.length > 0 ? tags : undefined,
@@ -122,10 +125,20 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                 </div>
 
                 <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{t.todoEditor.title || '内容 / 标题'}</label>
+                        <textarea
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            className="macos-input w-full p-3 resize-none h-20 text-[14px]"
+                            placeholder={t.todoEditor.titlePlaceholder || '输入内容或标题...'}
+                        />
+                    </div>
+
                     {!isFrozen && (
                         <div className="space-y-2">
                             <label className="text-[13px] font-medium text-[var(--color-ink-secondary)]">{t.todoEditor.deadline}</label>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
                                 <input
                                     type="date"
                                     value={deadlineDate}
@@ -138,6 +151,18 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
                                     onChange={(e) => setDeadlineTime(e.target.value)}
                                     className="macos-input w-24 p-2 text-[14px]"
                                 />
+                                {(deadlineDate || deadlineTime) && (
+                                    <button
+                                        onClick={() => {
+                                            setDeadlineDate('');
+                                            setDeadlineTime('');
+                                        }}
+                                        className="p-1.5 text-[var(--color-ink-tertiary)] hover:text-[var(--color-danger)] transition-colors rounded-md hover:bg-[rgba(0,0,0,0.05)] flex-shrink-0"
+                                        title={t.todoEditor.clearDeadline || "清除"}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

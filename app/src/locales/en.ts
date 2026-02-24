@@ -119,6 +119,9 @@ export const en = {
 
     // Todo Editor
     todoEditor: {
+        title: 'Content / Title',
+        titlePlaceholder: 'Enter content or title...',
+        clearDeadline: 'Clear date',
         editTodo: 'Edit Todo',
         editCollection: 'Edit Item',
         stashToCollection: 'Stash to Collection',
