@@ -65,7 +65,7 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
     };
 
     const handleSave = async () => {
-        let deadlineTimestamp: number | undefined = undefined;
+        let deadlineTimestamp: number | null = null;
 
         if (deadlineDate) {
             const timeStr = deadlineTime || '23:59';
@@ -79,8 +79,8 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
         const updates: Partial<Item> = {
             content: content.trim() || item.content,
             deadline: deadlineTimestamp,
-            details: details.trim() || undefined,
-            tags: tags.length > 0 ? tags : undefined,
+            details: details.trim() || null,
+            tags: tags.length > 0 ? tags : null,
         };
 
         if (newStatus) {

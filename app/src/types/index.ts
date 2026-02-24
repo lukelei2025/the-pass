@@ -44,9 +44,9 @@ export interface Item {
   processedAt?: number;
   originalUrl?: string;
   title?: string;
-  deadline?: number;
-  details?: string;
-  tags?: string[];
+  deadline?: number | null;
+  details?: string | null;
+  tags?: string[] | null;
 }
 
 /**
