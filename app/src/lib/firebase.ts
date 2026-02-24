@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, indexedDBLocalPersistence, GoogleAuthProvider, browserLocalPersistence, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, GoogleAuthProvider, browserLocalPersistence, browserPopupRedirectResolver, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 
 /**
@@ -47,7 +47,8 @@ const app = initializeApp(firebaseConfig);
 
 // Auth
 export const auth = initializeAuth(app, {
-    persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver
 });
 export const googleProvider = new GoogleAuthProvider();
 
