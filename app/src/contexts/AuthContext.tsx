@@ -14,6 +14,7 @@ import {
     isSignInWithEmailLink,
     signInWithEmailLink
 } from '../lib/firebase';
+import { browserPopupRedirectResolver } from 'firebase/auth';
 
 /**
  * 检测是否运行在 PWA standalone 模式
@@ -44,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         // 检查重定向登录的结果 (处理 signInWithRedirect 返回的情况)
-        getRedirectResult(auth).then((result) => {
+        getRedirectResult(auth, browserPopupRedirectResolver).then((result) => {
             if (result) {
                 console.log('[Auth] Redirect login success:', result.user.uid);
             }
@@ -87,10 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('[Auth] Attempting Google sign in...');
             if (isPWAMode()) {
                 console.log('[Auth] PWA mode detected, using redirect sign-in');
-                await signInWithRedirect(auth, googleProvider);
+                await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
             } else {
                 console.log('[Auth] Standard mode, using popup sign-in');
-                await signInWithPopup(auth, googleProvider);
+                await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
             }
         } catch (error) {
             if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'auth/cancelled-popup-request') {
