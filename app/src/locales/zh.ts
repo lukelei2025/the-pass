@@ -117,6 +117,7 @@ export const zh: Locale = {
         noNote: '无笔记。点击添加...',
         copyNotion: '复制 Notion',
         editNote: '编辑笔记',
+        noDeadline: '无截止日期',
     },
 
     // Todo Editor

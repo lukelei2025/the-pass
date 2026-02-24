@@ -98,12 +98,19 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         </div>
       )}
 
-      {isTodo && item.deadline && (
+      {isTodo && (
         <div className="flex items-center justify-end mb-3">
-          <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded ${getDeadlineColor(item.deadline)}`}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-            {formatDeadline(item.deadline)}
-          </div>
+          {item.deadline ? (
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded ${getDeadlineColor(item.deadline)}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              {formatDeadline(item.deadline)}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded text-[var(--color-ink-secondary)] bg-[rgba(0,0,0,0.04)]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              {t.item.noDeadline || 'No deadline'}
+            </div>
+          )}
         </div>
       )}
 

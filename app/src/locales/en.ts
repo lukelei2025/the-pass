@@ -115,6 +115,7 @@ export const en = {
         noNote: 'No note. Click to add...',
         copyNotion: 'Copy Notion',
         editNote: 'Edit Note',
+        noDeadline: 'No deadline',
     },
 
     // Todo Editor
