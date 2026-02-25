@@ -13,7 +13,14 @@ import LoginPage from './views/LoginPage';
 import UserAvatarMenu from './components/UserAvatarMenu';
 
 function AppContent() {
-  const { currentView, checkExpired, setCurrentView, initializeForUser } = useStore();
+  const {
+    currentView,
+    checkExpired,
+    setCurrentView,
+    initializeForUser,
+    clearUserSession,
+    isInitializingUser,
+  } = useStore();
   const { user, loading } = useAuth();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
@@ -26,9 +33,14 @@ function AppContent() {
   // Initialize store when user logs in
   useEffect(() => {
     if (user) {
-      initializeForUser(user.uid);
+      initializeForUser(user.uid).catch((error) => {
+        console.error('[App] initializeForUser failed:', error);
+      });
+      return;
     }
-  }, [user, initializeForUser]);
+
+    clearUserSession();
+  }, [user, initializeForUser, clearUserSession]);
 
 
 
@@ -41,7 +53,7 @@ function AppContent() {
   useEffect(() => { checkExpired(); }, [checkExpired]);
 
   // Loading state
-  if (loading) {
+  if (loading || (user && isInitializingUser)) {
     return (
       <div className="min-h-screen bg-[var(--color-bg-app)] flex items-center justify-center">
         <div className="text-[var(--color-ink-secondary)] text-[15px]">Loading...</div>

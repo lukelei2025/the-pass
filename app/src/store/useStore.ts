@@ -43,6 +43,8 @@ interface StoreState {
   userId: string | null;
   isOnline: boolean;
   migrationDone: boolean;
+  isInitializingUser: boolean;
+  initializingUserId: string | null;
 
   // Items 操作
   addItem: (item: Omit<Item, 'id' | 'createdAt' | 'expiresAt'>) => Promise<void>;
@@ -64,6 +66,7 @@ interface StoreState {
   // Auth
   setUserId: (userId: string | null) => void;
   initializeForUser: (userId: string) => Promise<void>;
+  clearUserSession: () => void;
 
   // Stats
   loadStats: () => Promise<void>;
@@ -100,6 +103,8 @@ export const useStore = create<StoreState>()(
       userId: null,
       isOnline: true,
       migrationDone: false,
+      isInitializingUser: false,
+      initializingUserId: null,
 
       // Set the logged-in user ID
       setUserId: (userId) => {
@@ -108,60 +113,93 @@ export const useStore = create<StoreState>()(
 
       // Initialize store for a logged-in user
       initializeForUser: async (userId) => {
+        const state = get();
+        if (state.isInitializingUser && state.initializingUserId === userId) {
+          return;
+        }
+
+        // 先写入 userId，避免初始化期间 addItem 错误走本地分支
+        set({
+          userId,
+          isOnline: true,
+          isInitializingUser: true,
+          initializingUserId: userId,
+        });
+
         // 注释：离线持久化已在 firebase.ts 中通过 persistentLocalCache 启用
         // 无需手动调用 enableOfflinePersistence
 
-        if (!get().migrationDone) {
+        try {
+          if (!get().migrationDone) {
+            try {
+              // Read all local items
+              const localItems: Item[] = [];
+              await itemsStore.iterate<Item, void>((value) => {
+                localItems.push(value);
+              });
+
+              // Read local settings
+              const localSettings = await settingsStore.getItem<Settings>('settings');
+
+              await firestoreService.migrateLocalData(
+                userId,
+                localItems,
+                localSettings || defaultSettings
+              );
+
+              set({ migrationDone: true });
+            } catch (error) {
+              console.error('Migration error:', error);
+            }
+          }
+
+          // 2. Load settings from Firestore
           try {
-            // Read all local items
-            const localItems: Item[] = [];
-            await itemsStore.iterate<Item, void>((value) => {
-              localItems.push(value);
-            });
-
-            // Read local settings
-            const localSettings = await settingsStore.getItem<Settings>('settings');
-
-            await firestoreService.migrateLocalData(
-              userId,
-              localItems,
-              localSettings || defaultSettings
-            );
-
-            set({ migrationDone: true });
+            const cloudSettings = await firestoreService.getSettings(userId);
+            if (cloudSettings) {
+              set({ settings: cloudSettings });
+            }
           } catch (error) {
-            console.error('Migration error:', error);
+            console.error('Failed to load cloud settings:', error);
           }
-        }
 
-        // 2. Load settings from Firestore
-        try {
-          const cloudSettings = await firestoreService.getSettings(userId);
-          if (cloudSettings) {
-            set({ settings: cloudSettings });
+          // 3. Load stats from Firestore
+          try {
+            const cloudStats = await firestoreService.getStats(userId);
+            set({ stats: cloudStats });
+          } catch (error) {
+            console.error('Failed to load cloud stats:', error);
           }
-        } catch (error) {
-          console.error('Failed to load cloud settings:', error);
-        }
 
-        // 3. Load stats from Firestore
-        try {
-          const cloudStats = await firestoreService.getStats(userId);
-          set({ stats: cloudStats });
-        } catch (error) {
-          console.error('Failed to load cloud stats:', error);
-        }
+          // 4. Subscribe to real-time items
+          if (unsubscribeItems) {
+            unsubscribeItems();
+          }
 
-        // 4. Subscribe to real-time items
+          unsubscribeItems = firestoreService.subscribeToItems(userId, (items) => {
+            set({ items });
+          });
+        } finally {
+          set({
+            isInitializingUser: false,
+            initializingUserId: null,
+          });
+        }
+      },
+
+      clearUserSession: () => {
         if (unsubscribeItems) {
           unsubscribeItems();
+          unsubscribeItems = null;
         }
 
-        unsubscribeItems = firestoreService.subscribeToItems(userId, (items) => {
-          set({ items });
+        set({
+          userId: null,
+          items: [],
+          stats: defaultUserStats,
+          isInitializingUser: false,
+          initializingUserId: null,
         });
-
-        set({ userId, isOnline: true });
       },
 
       // Load stats from Firestore (for refreshing in HistoryView)
