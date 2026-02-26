@@ -145,7 +145,8 @@ export const zh: Locale = {
     categorySelect: {
         prompt: '请选择分类',
         cancel: '取消',
-        llmFailed: '智能分类已关闭，请手动选择',
+        llmDisabled: '智能分类已关闭，请手动选择',
+        llmFailed: 'AI分类失败，请手动选择',
         offline: '离线模式，请手动选择',
         changeCategory: '更改分类',
     },

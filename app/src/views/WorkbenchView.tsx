@@ -235,7 +235,7 @@ export default function WorkbenchView() {
               {classificationReason === 'offline'
                 ? t.categorySelect.offline  // 离线模式
                 : classificationReason === 'disabled'
-                ? t.categorySelect.llmFailed  // 智能分类已关闭
+                ? t.categorySelect.llmDisabled  // 智能分类已关闭
                 : t.categorySelect.llmFailed  // AI分类失败
               }
             </h2>

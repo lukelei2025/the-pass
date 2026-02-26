@@ -143,7 +143,8 @@ export const en = {
     categorySelect: {
         prompt: 'Select a category',
         cancel: 'Cancel',
-        llmFailed: 'Auto-classification disabled, please select manually',
+        llmDisabled: 'Auto-classification disabled, please select manually',
+        llmFailed: 'AI classification failed, please select manually',
         offline: 'Offline mode, please select manually',
         changeCategory: 'Change category',
     },
