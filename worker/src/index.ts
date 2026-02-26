@@ -13,7 +13,7 @@ import { GenericPlatform } from './platforms/generic';
 import { createCorsHeaders, createOptionsResponse } from './utils/cors';
 import { Env, TitleResult } from './platforms/base';
 import { CLASSIFICATION_RULES } from './classification-rules';
-import { USER_AGENTS } from './config/constants';
+import { CONFIG, USER_AGENTS } from './config/constants';
 
 // 平台处理器列表（按优先级排序）
 const PLATFORMS = [
@@ -142,24 +142,37 @@ ${JSON.stringify(metadata || {}, null, 2)}
 }
 `;
 
-        const response = await fetch(GLM_CHAT_COMPLETIONS_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${glmApiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'glm-4',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.1,
-                max_tokens: 2000,
-            }),
-        });
+        let response: Response;
+        try {
+            response = await fetch(GLM_CHAT_COMPLETIONS_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${glmApiKey}`,
+                },
+                body: JSON.stringify({
+                    model: 'glm-4',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.1,
+                    max_tokens: 2000,
+                }),
+                signal: AbortSignal.timeout(CONFIG.TIMEOUT),
+            });
+        } catch (error: any) {
+            const isTimeout = error?.name === 'AbortError' || error?.name === 'TimeoutError';
+            return new Response(JSON.stringify({
+                error: isTimeout ? 'GLM API Timeout' : 'GLM API Request Failed',
+                details: error?.message || String(error),
+            }), {
+                status: isTimeout ? 504 : 502,
+                headers: createCorsHeaders(),
+            });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();
             return new Response(JSON.stringify({ error: 'GLM API Failed', details: errorText }), {
-                status: 500,
+                status: response.status >= 500 ? 502 : response.status,
                 headers: createCorsHeaders(),
             });
         }

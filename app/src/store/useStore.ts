@@ -334,12 +334,12 @@ export const useStore = create<StoreState>()(
         const retentionMs = retentionHours * 60 * 60 * 1000;
 
         // Filter items to DELETE:
-        // 1. Status is in ['cooked', 'todo', 'composted', 'expired'] (NOT 'frozen')
+        // 1. Status is in ['cooked', 'composted', 'expired'] (preserve pending/todo/frozen)
         // 2. Time (processedAt or createdAt) is older than retention period
         const itemsToDelete = items.filter(item => {
-          if (item.status === 'frozen' || item.status === 'pending') return false; // Preserve frozen and pending
+          if (item.status === 'frozen' || item.status === 'pending' || item.status === 'todo') return false; // Preserve frozen, pending and todo
 
-          if (['cooked', 'todo', 'composted', 'expired'].includes(item.status)) {
+          if (['cooked', 'composted', 'expired'].includes(item.status)) {
             const time = item.processedAt || item.createdAt;
             return (now - time) > retentionMs;
           }

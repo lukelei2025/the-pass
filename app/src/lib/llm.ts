@@ -93,15 +93,14 @@ async function fetchWithRetry(
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+        try {
             const response = await fetch(url, {
                 ...options,
                 signal: controller.signal,
             });
-            clearTimeout(timeoutId);
 
             // 5xx 服务端错误时重试，其余状态直接返回
             if (response.status >= 500 && attempt < maxAttempts) {
@@ -118,6 +117,8 @@ async function fetchWithRetry(
             if (attempt < maxAttempts) {
                 await new Promise(r => setTimeout(r, backoffMs * attempt));
             }
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 
@@ -291,7 +292,13 @@ export async function classifyContent(
         );
 
         if (!response.ok) {
-            console.error('Worker Classify Failed:', response.status);
+            let errorBody = '';
+            try {
+                errorBody = await response.text();
+            } catch {
+                // ignore read body error
+            }
+            console.error('Worker Classify Failed:', response.status, errorBody);
             return { category: isLink ? 'external' : 'others', metadata, success: false, offline: response.status === 0 || !navigator.onLine };
         }
 
