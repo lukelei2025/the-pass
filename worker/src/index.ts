@@ -25,6 +25,9 @@ const PLATFORMS = [
     new GenericPlatform(), // 兜底
 ];
 
+const GLM_BASE_URL = 'https://open.bigmodel.cn/api/coding/paas/v4';
+const GLM_CHAT_COMPLETIONS_URL = `${GLM_BASE_URL}/chat/completions`;
+
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
         const url = new URL(request.url);
@@ -139,7 +142,7 @@ ${JSON.stringify(metadata || {}, null, 2)}
 }
 `;
 
-        const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+        const response = await fetch(GLM_CHAT_COMPLETIONS_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
