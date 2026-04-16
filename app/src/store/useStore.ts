@@ -14,6 +14,7 @@ import {
 } from '../types';
 import * as firestoreService from '../lib/firestoreService';
 import { buildThoughtEntryFromItem } from '../lib/thoughts';
+import { getStatsDeltasForStatusChange } from '../lib/stats';
 
 // 初始化 localForage (kept for migration and offline fallback)
 const itemsStore = localforage.createInstance({
@@ -314,17 +315,8 @@ export const useStore = create<StoreState>()(
 
           // Track status changes for cumulative stats
           if (updates.status && oldItem && oldItem.status !== updates.status) {
-            const deltas: Partial<Record<keyof UserStats, number>> = {};
             const newStatus = updates.status;
-
-            // Count as processed when moving out of pending
-            if (oldItem.status === 'pending' && newStatus !== 'pending') {
-              deltas.totalProcessed = 1;
-            }
-            // Track specific destination statuses
-            if (newStatus === 'todo') deltas.totalTodos = 1;
-            if (newStatus === 'frozen') deltas.totalStashed = 1;
-            if (newStatus === 'cooked' && oldItem.status === 'todo') deltas.completedTodos = 1;
+            const deltas = getStatsDeltasForStatusChange(oldItem.status, newStatus);
 
             if (Object.keys(deltas).length > 0) {
               await firestoreService.incrementStats(userId, deltas);
