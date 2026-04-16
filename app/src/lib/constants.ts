@@ -223,6 +223,7 @@ export function getStatusColor(status: string): string {
     pending: 'text-gray-600 dark:text-gray-400',
     cooked: 'text-green-600 dark:text-green-400',
     todo: 'text-blue-600 dark:text-blue-400',
+    thought: 'text-orange-600 dark:text-orange-400',
     frozen: 'text-cyan-600 dark:text-cyan-400',
     composted: 'text-gray-400 dark:text-gray-600',
     expired: 'text-red-600 dark:text-red-400',

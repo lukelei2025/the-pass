@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from '../hooks/useTranslation';
 import { useStore } from '../store/useStore';
@@ -13,43 +12,43 @@ interface TodoEditorDialogProps {
 }
 
 export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: TodoEditorDialogProps) {
+    if (!isOpen) return null;
+
+    return (
+        <TodoEditorDialogContent
+            item={item}
+            onClose={onClose}
+            newStatus={newStatus}
+        />
+    );
+}
+
+function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDialogProps, 'isOpen'>) {
     const { t } = useTranslation();
     const { updateItem } = useStore();
-    const [deadlineDate, setDeadlineDate] = useState('');
-    const [deadlineTime, setDeadlineTime] = useState('');
-    const [content, setContent] = useState('');
-    const [details, setDetails] = useState('');
-    const [tags, setTags] = useState<string[]>([]);
+    const initialDeadline = item.deadline ? new Date(item.deadline) : null;
+    const [deadlineDate, setDeadlineDate] = useState(() => {
+        if (!initialDeadline) return '';
+        const yyyy = initialDeadline.getFullYear();
+        const mm = String(initialDeadline.getMonth() + 1).padStart(2, '0');
+        const dd = String(initialDeadline.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    });
+    const [deadlineTime, setDeadlineTime] = useState(() => {
+        if (!initialDeadline) return '';
+        const hh = String(initialDeadline.getHours()).padStart(2, '0');
+        const min = String(initialDeadline.getMinutes()).padStart(2, '0');
+        return `${hh}:${min}`;
+    });
+    const [content, setContent] = useState(() => item.title || item.content || '');
+    const [details, setDetails] = useState(() => item.details || '');
+    const [tags, setTags] = useState<string[]>(() => item.tags || []);
     const [tagInput, setTagInput] = useState('');
     const [isAddingTag, setIsAddingTag] = useState(false);
 
     // Determine if we are in "Frozen/Collection" mode
     // Either moving to frozen (newStatus) OR editing an existing frozen item
     const isFrozen = newStatus === 'frozen' || (!newStatus && item.status === 'frozen');
-
-    useEffect(() => {
-        if (isOpen && item) {
-            if (item.deadline) {
-                const date = new Date(item.deadline);
-                // Format to YYYY-MM-DD
-                const yyyy = date.getFullYear();
-                const mm = String(date.getMonth() + 1).padStart(2, '0');
-                const dd = String(date.getDate()).padStart(2, '0');
-                setDeadlineDate(`${yyyy}-${mm}-${dd}`);
-
-                // Format to HH:mm
-                const hh = String(date.getHours()).padStart(2, '0');
-                const min = String(date.getMinutes()).padStart(2, '0');
-                setDeadlineTime(`${hh}:${min}`);
-            } else {
-                setDeadlineDate('');
-                setDeadlineTime('');
-            }
-            setContent(item.title || item.content || '');
-            setDetails(item.details || '');
-            setTags(item.tags || []);
-        }
-    }, [isOpen, item]);
 
     const handleAddTag = () => {
         const trimmed = tagInput.trim();
@@ -91,8 +90,6 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
         await updateItem(item.id, updates);
         onClose();
     };
-
-    if (!isOpen) return null;
 
     // Determine Title
     let title = t.todoEditor.editTodo;

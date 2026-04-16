@@ -20,6 +20,7 @@ export type ItemStatus =
   | 'pending'    // 📋 待处理
   | 'cooked'     // 🔪 已处理
   | 'todo'       // 🥘 导出为任务
+  | 'thought'    // 🧠 导出为思绪
   | 'frozen'     // 🧊 导出为存储
   | 'composted'  // 🗑️ 已删除
   | 'expired';   // ⏰ 过期
@@ -49,6 +50,45 @@ export interface Item {
   tags?: string[] | null;
 }
 
+export interface ThoughtContainer {
+  id: string;
+  title: string;
+  description?: string | null;
+  tags?: string[] | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ThoughtEntry {
+  id: string;
+  containerId: string;
+  title: string;
+  content: string;
+  tags: string[];
+  recordedAt: number;
+  sourceItemId?: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ThoughtContainerDraft {
+  title: string;
+  description?: string | null;
+  tags?: string[] | null;
+}
+
+export interface ThoughtEntryDraft {
+  containerId?: string | null;
+  createContainer?: boolean;
+  containerTitle?: string;
+  containerDescription?: string | null;
+  containerTags?: string[] | null;
+  title: string;
+  content: string;
+  tags: string[];
+  recordedAt: number;
+}
+
 /**
  * 用户设置
  */
@@ -75,7 +115,7 @@ export interface ExportData {
 /**
  * 视图类型
  */
-export type ViewType = 'workbench' | 'menu' | 'freezer' | 'history' | 'settings';
+export type ViewType = 'workbench' | 'menu' | 'freezer' | 'thoughts' | 'history' | 'settings';
 
 /**
  * 分类信息

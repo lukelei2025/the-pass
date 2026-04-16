@@ -1,9 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { mapCategory } from '../lib/constants';
 import { useTranslation } from '../hooks/useTranslation';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import SwipeableHistoryRow from '../components/SwipeableHistoryRow';
+
+function StatsCard({ label, value, colorClass }: { label: string, value: string | number, colorClass: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[13px] font-medium text-[var(--color-ink-secondary)] mb-1">{label}</span>
+      <span className={`text-[20px] font-semibold leading-none ${colorClass}`}>{value}</span>
+    </div>
+  );
+}
 
 export default function HistoryView() {
   const { items, cleanupOldHistory, stats, loadStats, restoreItem } = useStore();
@@ -15,11 +24,11 @@ export default function HistoryView() {
     loadStats();
   }, [cleanupOldHistory, loadStats]);
 
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const retentionMs = 48 * 60 * 60 * 1000;
 
   const processedItems = items.filter(item => {
-    if (!['cooked', 'todo', 'frozen', 'composted', 'expired'].includes(item.status)) return false;
+    if (!['cooked', 'todo', 'thought', 'frozen', 'composted', 'expired'].includes(item.status)) return false;
     const time = item.processedAt || item.createdAt;
     return (now - time) <= retentionMs;
   }).sort((a, b) => (b.processedAt || b.createdAt) - (a.processedAt || a.createdAt));
@@ -27,6 +36,7 @@ export default function HistoryView() {
   const statusMap: Record<string, string> = {
     cooked: t.actions.clear,
     todo: t.actions.todo,
+    thought: t.actions.thought,
     frozen: t.actions.stash,
     composted: t.actions.void,
     expired: t.actions.expired,
@@ -48,13 +58,6 @@ export default function HistoryView() {
           const { totalZaps, totalProcessed, totalTodos, completedTodos, totalStashed } = stats;
           const processRate = totalZaps > 0 ? Math.round((totalProcessed / totalZaps) * 100) : 0;
           const completionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
-
-          const StatsCard = ({ label, value, colorClass }: { label: string, value: string | number, colorClass: string }) => (
-            <div className="flex flex-col">
-              <span className="text-[13px] font-medium text-[var(--color-ink-secondary)] mb-1">{label}</span>
-              <span className={`text-[20px] font-semibold leading-none ${colorClass}`}>{value}</span>
-            </div>
-          );
 
           return (
             <div className="flex flex-wrap gap-y-8 gap-x-4 md:gap-x-12 items-center px-1">

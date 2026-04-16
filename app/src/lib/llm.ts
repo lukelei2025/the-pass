@@ -31,6 +31,37 @@ export interface ClassificationResult {
     disabled?: boolean;  // 是否用户主动关闭智能分类
 }
 
+interface WorkerTitleResponse {
+    title?: string;
+    author?: string | { account?: string; author?: string };
+    account?: string;
+    resolvedUrl?: string;
+}
+
+interface WorkerClassificationResponse {
+    category?: string;
+}
+
+function getAuthorName(author?: WorkerTitleResponse['author'], account?: string): string | null {
+    if (typeof author === 'string') {
+        return author.trim() || null;
+    }
+
+    if (author?.account) {
+        return author.account.trim() || null;
+    }
+
+    if (author?.author) {
+        return author.author.trim() || null;
+    }
+
+    if (account) {
+        return account.trim() || null;
+    }
+
+    return null;
+}
+
 /**
  * 已知平台识别
  */
@@ -110,9 +141,10 @@ async function fetchWithRetry(
             }
 
             return response;
-        } catch (err: any) {
-            lastError = err;
-            console.warn(`[fetchWithRetry] Attempt ${attempt}/${maxAttempts} failed:`, err.message || err);
+        } catch (err: unknown) {
+            const retryError = err instanceof Error ? err : new Error(String(err));
+            lastError = retryError;
+            console.warn(`[fetchWithRetry] Attempt ${attempt}/${maxAttempts} failed:`, retryError.message || retryError);
 
             if (attempt < maxAttempts) {
                 await new Promise(r => setTimeout(r, backoffMs * attempt));
@@ -139,11 +171,11 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
             const response = await fetchWithRetry(wechatWorkerUrl, {}, { timeoutMs });
 
             if (response.ok) {
-                const data = await response.json();
+                const data = await response.json() as WorkerTitleResponse;
                 if (data.title) {
                     console.log(`[WeChat Worker] 获取到标题: ${data.title}`);
                     // 优先使用公众号名称 (account)，其次是作者 (author)
-                    const authorName = data.author?.account || data.author?.author || data.account;
+                    const authorName = getAuthorName(data.author, data.account);
                     return authorName ? `${data.title} #${authorName}` : data.title;
                 }
             }
@@ -159,7 +191,7 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
         const response = await fetchWithRetry(workerUrl, {}, { timeoutMs });
 
         if (response.ok) {
-            const data = await response.json();
+            const data = await response.json() as WorkerTitleResponse;
             if (data.title) {
                 console.log(`[Cloudflare Worker] 获取到标题: ${data.title}`, data);
                 // 如果 Worker 已经返回了格式化的标题（包含 #），直接使用
@@ -167,8 +199,9 @@ async function fetchPageTitle(url: string, timeoutMs = REQUEST_TIMEOUT.default):
                     return data.title;
                 }
                 // 优先使用 Worker 返回的作者（确保非空）
-                if (data.author && data.author.trim() && !data.title.includes('#')) {
-                    return `${data.title} #${data.author}`;
+                const authorName = getAuthorName(data.author, data.account);
+                if (authorName && !data.title.includes('#')) {
+                    return `${data.title} #${authorName}`;
                 }
                 // 如果没有有效作者，只返回标题，不添加平台名
                 return data.title;
@@ -193,7 +226,7 @@ async function resolveShortLink(url: string): Promise<string> {
             return url;
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as WorkerTitleResponse;
         if (data?.resolvedUrl && typeof data.resolvedUrl === 'string') {
             return data.resolvedUrl;
         }
@@ -302,7 +335,7 @@ export async function classifyContent(
             return { category: isLink ? 'external' : 'others', metadata, success: false, offline: response.status === 0 || !navigator.onLine };
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as WorkerClassificationResponse;
         console.log('[Worker Classify Result]:', data);
 
         if (data && data.category) {

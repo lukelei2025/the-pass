@@ -16,6 +16,7 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
     const { t } = useTranslation();
     const { setCurrentView } = useStore();
     const [isOpen, setIsOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState<React.CSSProperties>({});
     const buttonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,32 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!isOpen || !buttonRef.current) return;
+
+        const rect = buttonRef.current.getBoundingClientRect();
+        const menuWidth = 192;
+
+        if (window.innerWidth < 768) {
+            const left = rect.left + menuWidth > window.innerWidth
+                ? window.innerWidth - menuWidth - 12
+                : rect.left;
+
+            setMenuPosition({
+                position: 'fixed',
+                left: `${left}px`,
+                top: `${rect.bottom + 8}px`,
+            });
+            return;
+        }
+
+        setMenuPosition({
+            position: 'fixed',
+            left: `${rect.left}px`,
+            bottom: `${window.innerHeight - rect.top + 8}px`,
+        });
+    }, [isOpen]);
+
     if (!user) return null;
 
     const avatarSize = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-[11px]';
@@ -43,34 +70,6 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
         if (user.displayName) return user.displayName.charAt(0).toUpperCase();
         if (user.email) return user.email.charAt(0).toUpperCase();
         return '?';
-    };
-
-    // 计算菜单位置 (基于按钮位置)
-    const getMenuPosition = () => {
-        if (!buttonRef.current) return {};
-        const rect = buttonRef.current.getBoundingClientRect();
-        const menuWidth = 192; // w-48 = 12rem = 192px
-
-        // 移动端 (宽 < 768px)：向下弹出
-        if (window.innerWidth < 768) {
-            // 如果左侧定位会导致溢出，则右对齐
-            const left = rect.left + menuWidth > window.innerWidth
-                ? window.innerWidth - menuWidth - 12 // 12px margin from edge
-                : rect.left;
-
-            return {
-                position: 'fixed' as const,
-                left: `${left}px`,
-                top: `${rect.bottom + 8}px`, // 向下
-            };
-        }
-
-        // 桌面端：向上弹出 (保持原有逻辑)
-        return {
-            position: 'fixed' as const,
-            left: `${rect.left}px`,
-            bottom: `${window.innerHeight - rect.top + 8}px`, // 向上
-        };
     };
 
     return (
@@ -99,7 +98,7 @@ export default function UserAvatarMenu({ size = 'md' }: { size?: 'sm' | 'md' }) 
                 <div
                     ref={menuRef}
                     className="w-48 bg-white rounded-xl shadow-lg border border-[var(--color-border)] py-1 z-[9999] animate-in fade-in zoom-in-95 duration-150"
-                    style={getMenuPosition()}
+                    style={menuPosition}
                 >
                     {/* User Info */}
                     <div className="px-3 py-2 border-b border-[var(--color-border)]">

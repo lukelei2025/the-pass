@@ -35,9 +35,6 @@ export function useMediaQuery(query: string): boolean {
   useEffect(() => {
     const mediaQuery = window.matchMedia(query);
 
-    // 设置初始值
-    setMatches(mediaQuery.matches);
-
     // 监听变化
     const handler = (event: MediaQueryListEvent) => {
       setMatches(event.matches);

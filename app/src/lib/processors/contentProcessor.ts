@@ -62,8 +62,8 @@ export function extractUrl(input: string): string | null {
 
 export function normalizeUrl(rawUrl: string): string {
   let cleaned = rawUrl.trim();
-  cleaned = cleaned.replace(/^[\(\[\{<]+/, '');
-  cleaned = cleaned.replace(/[\)\]\}>.,!?;:]+$/, '');
+  cleaned = cleaned.replace(/^[([{<]+/, '');
+  cleaned = cleaned.replace(/[)\]}>.,!?;:]+$/, '');
 
   if (!/^https?:\/\//i.test(cleaned)) {
     return `https://${cleaned}`;

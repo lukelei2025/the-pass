@@ -71,7 +71,7 @@ function extractAuthor(html: string, url: string): string | null {
                 const props = JSON.parse(scriptMatch[1]);
                 if (props?.doc?.author) return props.doc.author;
                 if (props?.author) return props.author;
-            } catch (e) {
+            } catch {
                 // 忽略解析错误
             }
         }
@@ -104,7 +104,11 @@ async function fetchTwitterOEmbed(url: string): Promise<string | null> {
             headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' }
         });
         if (!response.ok) return null;
-        const data = await response.json() as any;
+        const data = await response.json() as {
+            author_name?: string;
+            html?: string;
+            title?: string;
+        };
 
         // Same extraction logic
         const authorName = data.author_name;

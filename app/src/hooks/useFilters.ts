@@ -11,6 +11,8 @@ export interface FilterState {
   selectedTags: Set<string>;
 }
 
+type FilterStateWithTags = FilterState & { selectedTags: Set<string> };
+
 /**
  * 筛选选项接口
  */
@@ -104,14 +106,14 @@ export function useFilters<T extends Item>(
 
   // 应用筛选
   const filteredItems = useMemo(() => {
-    const filters = {
+    const filters: FilterStateWithTags = {
       searchQuery,
       selectedCategories,
       selectedSources,
       selectedTags,
     };
 
-    return items.filter(item => (filterFn || defaultFilter)(item, filters as any));
+    return items.filter(item => (filterFn || defaultFilter)(item, filters));
   }, [items, searchQuery, selectedCategories, selectedSources, selectedTags, filterFn, defaultFilter]);
 
   // 切换分类选中状态

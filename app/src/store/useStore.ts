@@ -1,8 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import localforage from 'localforage';
-import type { Item, Settings, Category, ItemStatus, UserStats } from '../types';
+import {
+  type Item,
+  type Settings,
+  type Category,
+  type ItemStatus,
+  type ThoughtContainer,
+  type ThoughtContainerDraft,
+  type ThoughtEntry,
+  type ThoughtEntryDraft,
+  type UserStats,
+} from '../types';
 import * as firestoreService from '../lib/firestoreService';
+import { buildThoughtEntryFromItem } from '../lib/thoughts';
 
 // 初始化 localForage (kept for migration and offline fallback)
 const itemsStore = localforage.createInstance({
@@ -35,9 +46,12 @@ const defaultUserStats: UserStats = {
 
 interface StoreState {
   items: Item[];
+  thoughtContainers: ThoughtContainer[];
+  thoughtEntries: ThoughtEntry[];
   settings: Settings;
   stats: UserStats;
-  currentView: 'workbench' | 'menu' | 'freezer' | 'history' | 'settings';
+  currentView: 'workbench' | 'menu' | 'freezer' | 'thoughts' | 'history' | 'settings';
+  selectedThoughtContainerId: string | null;
 
   // Auth state
   userId: string | null;
@@ -61,7 +75,8 @@ interface StoreState {
   updateSettings: (updates: Partial<Settings>) => Promise<void>;
 
   // 视图切换
-  setCurrentView: (view: 'workbench' | 'menu' | 'freezer' | 'history' | 'settings') => void;
+  setCurrentView: (view: 'workbench' | 'menu' | 'freezer' | 'thoughts' | 'history' | 'settings') => void;
+  setSelectedThoughtContainerId: (containerId: string | null) => void;
 
   // Auth
   setUserId: (userId: string | null) => void;
@@ -78,6 +93,15 @@ interface StoreState {
   checkDailyClearance: () => Promise<void>;
   exportData: () => Promise<string>;
   importData: (jsonData: string) => Promise<void>;
+
+  // Thoughts
+  createThoughtContainer: (draft: ThoughtContainerDraft) => Promise<string>;
+  updateThoughtContainer: (id: string, updates: Partial<ThoughtContainer>) => Promise<void>;
+  deleteThoughtContainer: (id: string) => Promise<void>;
+  createThoughtEntry: (draft: ThoughtEntryDraft & { containerId: string; sourceItemId?: string | null }) => Promise<string>;
+  updateThoughtEntry: (id: string, updates: Partial<ThoughtEntry>) => Promise<void>;
+  deleteThoughtEntry: (id: string) => Promise<void>;
+  moveItemToThought: (itemId: string, draft: ThoughtEntryDraft) => Promise<string>;
 }
 
 // 生成唯一 ID
@@ -92,14 +116,19 @@ function calculateExpireTime(hours: 24 | 48): number {
 
 // Firestore unsubscribe tracker
 let unsubscribeItems: (() => void) | null = null;
+let unsubscribeThoughtContainers: (() => void) | null = null;
+let unsubscribeThoughtEntries: (() => void) | null = null;
 
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       items: [],
+      thoughtContainers: [],
+      thoughtEntries: [],
       settings: defaultSettings,
       stats: defaultUserStats,
       currentView: 'workbench',
+      selectedThoughtContainerId: null,
       userId: null,
       isOnline: true,
       migrationDone: false,
@@ -179,6 +208,22 @@ export const useStore = create<StoreState>()(
           unsubscribeItems = firestoreService.subscribeToItems(userId, (items) => {
             set({ items });
           });
+
+          if (unsubscribeThoughtContainers) {
+            unsubscribeThoughtContainers();
+          }
+
+          unsubscribeThoughtContainers = firestoreService.subscribeToThoughtContainers(userId, (thoughtContainers) => {
+            set({ thoughtContainers });
+          });
+
+          if (unsubscribeThoughtEntries) {
+            unsubscribeThoughtEntries();
+          }
+
+          unsubscribeThoughtEntries = firestoreService.subscribeToThoughtEntries(userId, (thoughtEntries) => {
+            set({ thoughtEntries });
+          });
         } finally {
           set({
             isInitializingUser: false,
@@ -192,11 +237,22 @@ export const useStore = create<StoreState>()(
           unsubscribeItems();
           unsubscribeItems = null;
         }
+        if (unsubscribeThoughtContainers) {
+          unsubscribeThoughtContainers();
+          unsubscribeThoughtContainers = null;
+        }
+        if (unsubscribeThoughtEntries) {
+          unsubscribeThoughtEntries();
+          unsubscribeThoughtEntries = null;
+        }
 
         set({
           userId: null,
           items: [],
+          thoughtContainers: [],
+          thoughtEntries: [],
           stats: defaultUserStats,
+          selectedThoughtContainerId: null,
           isInitializingUser: false,
           initializingUserId: null,
         });
@@ -310,7 +366,7 @@ export const useStore = create<StoreState>()(
       clearHistory: async () => {
         const { userId, items } = get();
         const historyItems = items.filter(item =>
-          ['cooked', 'composted', 'expired'].includes(item.status)
+          ['cooked', 'thought', 'composted', 'expired'].includes(item.status)
         );
 
         if (historyItems.length === 0) return;
@@ -322,7 +378,7 @@ export const useStore = create<StoreState>()(
             await itemsStore.removeItem(item.id);
           }
           set((state) => ({
-            items: state.items.filter((i) => !['cooked', 'composted', 'expired'].includes(i.status)),
+            items: state.items.filter((i) => !['cooked', 'thought', 'composted', 'expired'].includes(i.status)),
           }));
         }
       },
@@ -334,12 +390,12 @@ export const useStore = create<StoreState>()(
         const retentionMs = retentionHours * 60 * 60 * 1000;
 
         // Filter items to DELETE:
-        // 1. Status is in ['cooked', 'composted', 'expired'] (preserve pending/todo/frozen)
+        // 1. Status is in ['cooked', 'thought', 'composted', 'expired'] (preserve pending/todo/frozen)
         // 2. Time (processedAt or createdAt) is older than retention period
         const itemsToDelete = items.filter(item => {
           if (item.status === 'frozen' || item.status === 'pending' || item.status === 'todo') return false; // Preserve frozen, pending and todo
 
-          if (['cooked', 'composted', 'expired'].includes(item.status)) {
+          if (['cooked', 'thought', 'composted', 'expired'].includes(item.status)) {
             const time = item.processedAt || item.createdAt;
             return (now - time) > retentionMs;
           }
@@ -417,7 +473,14 @@ export const useStore = create<StoreState>()(
 
       // 切换视图
       setCurrentView: (view) => {
-        set({ currentView: view });
+        set((state) => ({
+          currentView: view,
+          selectedThoughtContainerId: view === 'thoughts' ? state.selectedThoughtContainerId : null,
+        }));
+      },
+
+      setSelectedThoughtContainerId: (containerId) => {
+        set({ selectedThoughtContainerId: containerId });
       },
 
       // 检查过期卡片
@@ -500,9 +563,174 @@ export const useStore = create<StoreState>()(
             }
             set({ items: data.items });
           }
-        } catch (error) {
+        } catch {
           throw new Error('导入失败：数据格式不正确');
         }
+      },
+
+      createThoughtContainer: async (draft) => {
+        const { userId } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        const now = Date.now();
+        const container: ThoughtContainer = {
+          id: generateId(),
+          title: draft.title.trim(),
+          description: draft.description?.trim() || null,
+          tags: draft.tags?.length ? draft.tags : null,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await firestoreService.addThoughtContainer(userId, container);
+        set({ selectedThoughtContainerId: container.id });
+        return container.id;
+      },
+
+      updateThoughtContainer: async (id, updates) => {
+        const { userId } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        await firestoreService.updateThoughtContainer(userId, id, {
+          ...updates,
+          updatedAt: Date.now(),
+        });
+      },
+
+      deleteThoughtContainer: async (id) => {
+        const { userId, selectedThoughtContainerId } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        await firestoreService.deleteThoughtEntriesByContainer(userId, id);
+        await firestoreService.deleteThoughtContainer(userId, id);
+
+        if (selectedThoughtContainerId === id) {
+          set({ selectedThoughtContainerId: null });
+        }
+      },
+
+      createThoughtEntry: async (draft) => {
+        const { userId } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        const now = Date.now();
+        const entry: ThoughtEntry = {
+          id: generateId(),
+          containerId: draft.containerId,
+          title: draft.title.trim(),
+          content: draft.content.trim(),
+          tags: draft.tags,
+          recordedAt: draft.recordedAt,
+          sourceItemId: draft.sourceItemId || null,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await firestoreService.addThoughtEntry(userId, entry);
+        await firestoreService.updateThoughtContainer(userId, draft.containerId, {
+          updatedAt: now,
+        });
+        set({ selectedThoughtContainerId: draft.containerId });
+        return entry.id;
+      },
+
+      updateThoughtEntry: async (id, updates) => {
+        const { userId, thoughtEntries } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        const oldEntry = thoughtEntries.find((entry) => entry.id === id);
+        const nextContainerId = updates.containerId || oldEntry?.containerId;
+        const now = Date.now();
+
+        await firestoreService.updateThoughtEntry(userId, id, {
+          ...updates,
+          updatedAt: now,
+        });
+
+        if (oldEntry?.containerId) {
+          await firestoreService.updateThoughtContainer(userId, oldEntry.containerId, {
+            updatedAt: now,
+          });
+        }
+
+        if (nextContainerId && nextContainerId !== oldEntry?.containerId) {
+          await firestoreService.updateThoughtContainer(userId, nextContainerId, {
+            updatedAt: now,
+          });
+        }
+      },
+
+      deleteThoughtEntry: async (id) => {
+        const { userId, thoughtEntries } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        const entry = thoughtEntries.find((item) => item.id === id);
+        await firestoreService.deleteThoughtEntry(userId, id);
+
+        if (entry?.containerId) {
+          await firestoreService.updateThoughtContainer(userId, entry.containerId, {
+            updatedAt: Date.now(),
+          });
+        }
+      },
+
+      moveItemToThought: async (itemId, draft) => {
+        const { userId, items, createThoughtContainer, createThoughtEntry, updateItem } = get();
+        if (!userId) {
+          throw new Error('User not initialized');
+        }
+
+        const item = items.find((entry) => entry.id === itemId);
+        if (!item) {
+          throw new Error('Item not found');
+        }
+
+        let containerId = draft.containerId || null;
+        if (draft.createContainer || !containerId) {
+          containerId = await createThoughtContainer({
+            title: draft.containerTitle?.trim() || '未命名卡片',
+            description: draft.containerDescription?.trim() || null,
+            tags: draft.containerTags?.length ? draft.containerTags : null,
+          });
+        }
+
+        const thoughtEntry = buildThoughtEntryFromItem(item, {
+          ...draft,
+          containerId,
+        });
+
+        await createThoughtEntry({
+          containerId,
+          title: thoughtEntry.title,
+          content: thoughtEntry.content,
+          tags: thoughtEntry.tags,
+          recordedAt: thoughtEntry.recordedAt,
+          sourceItemId: thoughtEntry.sourceItemId,
+        });
+
+        await updateItem(itemId, {
+          status: 'thought',
+          processedAt: Date.now(),
+        });
+
+        set({
+          currentView: 'thoughts',
+          selectedThoughtContainerId: containerId,
+        });
+
+        return containerId;
       },
     }),
     {
