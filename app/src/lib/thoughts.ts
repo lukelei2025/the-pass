@@ -1,5 +1,7 @@
 import type { Item, ThoughtEntry, ThoughtEntryDraft } from '../types'
 
+export const THOUGHT_ICON_PATH = 'M12 2L22 12L12 22L2 12L12 2Z'
+
 function generateThoughtId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }

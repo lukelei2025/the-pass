@@ -12,6 +12,7 @@ import HistoryView from './views/HistoryView';
 import SettingsView from './views/SettingsView';
 import LoginPage from './views/LoginPage';
 import UserAvatarMenu from './components/UserAvatarMenu';
+import { THOUGHT_ICON_PATH } from './lib/thoughts';
 
 function AppContent() {
   const {
@@ -83,7 +84,7 @@ function AppContent() {
     { id: 'workbench', label: t.nav.zapIn, icon: 'M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5z' }, // Rounded Square
     { id: 'menu', label: t.nav.todo, icon: 'M3 21h18L12 3 3 21z' }, // Triangle
     { id: 'freezer', label: t.nav.stash, icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' }, // Star
-    { id: 'thoughts', label: t.nav.thoughts, icon: 'M12 3c-4.97 0-9 3.58-9 8 0 2.08.9 3.98 2.38 5.4V21l4.07-2.03c.49.09 1 .14 1.55.14 4.97 0 9-3.58 9-8s-4.03-8.11-9-8.11z' },
+    { id: 'thoughts', label: t.nav.thoughts, icon: THOUGHT_ICON_PATH },
     { id: 'history', label: t.nav.traces, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z' }, // Circle/Traces
   ] as const;
 

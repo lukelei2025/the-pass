@@ -5,6 +5,7 @@ import { getUrgencyIndicatorColor } from '../lib/styles/categoryStyles';
 import type { Item, Urgency } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { THOUGHT_ICON_PATH } from '../lib/thoughts';
 
 import ActionDrawer from './ActionDrawer';
 import CategoryTag from './ui/CategoryTag';
@@ -182,7 +183,7 @@ export default function ItemCard({ item, urgency, remainingText }: ItemCardProps
         )}
         {!isTodo && (
           <button onClick={(e) => { e.stopPropagation(); handleAction('thought'); }} title={t.actions.thought} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded bg-[rgba(0,0,0,0.04)] hover:bg-[var(--color-orange)] hover:text-white text-[var(--color-ink-secondary)] transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 9a2.5 2.5 0 115 0c0 1.06-.53 1.7-1.2 2.26-.77.65-1.55 1.25-1.55 2.24" /><path d="M12 17h.01" /><path d="M8.5 20h7" /><path d="M9 3.5A7 7 0 005 10c0 2.2.86 3.72 2.3 5.03.43.4.7.95.7 1.53V17h8v-.44c0-.58.27-1.13.7-1.53C18.14 13.72 19 12.2 19 10a7 7 0 00-10-6.5z" /></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={THOUGHT_ICON_PATH} /></svg>
             <span className="text-[13px] font-semibold">{t.actions.thought}</span>
           </button>
         )}

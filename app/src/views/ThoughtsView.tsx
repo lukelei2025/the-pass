@@ -193,11 +193,6 @@ export default function ThoughtsView() {
                     <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)]">
                       {new Date(entry.recordedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
                     </span>
-                    {entry.sourceItemId && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[rgba(0,0,0,0.04)] text-[var(--color-ink-secondary)]">
-                        {t.thoughts.sourceItem}
-                      </span>
-                    )}
                   </div>
                   <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">{entry.title}</h3>
                   <p className="mt-1 text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap line-clamp-3">
