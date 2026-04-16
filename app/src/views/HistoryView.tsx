@@ -121,8 +121,8 @@ export default function HistoryView() {
                   return (
                     <SwipeableHistoryRow
                       key={item.id}
-                      onRestore={() => restoreItem(item.id)}
-                      restoreLabel={t.actions.restore}
+                      onAction={() => restoreItem(item.id)}
+                      actionLabel={t.actions.restore}
                     >
                       {rowContent}
                     </SwipeableHistoryRow>

@@ -2,14 +2,24 @@ import { useRef, useState, useCallback, type ReactNode } from 'react';
 
 interface SwipeableHistoryRowProps {
     children: ReactNode;
-    onRestore: () => void;
-    restoreLabel: string;
+    onAction: () => void;
+    actionLabel: string;
+    iconPath?: string;
+    actionClassName?: string;
 }
 
 const SWIPE_THRESHOLD = 28; // px needed to snap open
 const REVEAL_WIDTH = 48;    // width of the icon area revealed
 
-export default function SwipeableHistoryRow({ children, onRestore, restoreLabel }: SwipeableHistoryRowProps) {
+const DEFAULT_ICON_PATH = 'M3.51 15a9 9 0 1 0 2.13-9.36L1 10'
+
+export default function SwipeableHistoryRow({
+    children,
+    onAction,
+    actionLabel,
+    iconPath,
+    actionClassName,
+}: SwipeableHistoryRowProps) {
     const [offsetX, setOffsetX] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
@@ -74,11 +84,11 @@ export default function SwipeableHistoryRow({ children, onRestore, restoreLabel 
         isHorizontal.current = null;
     }, [offsetX, isOpen]);
 
-    const handleRestore = useCallback(() => {
-        onRestore();
+    const handleAction = useCallback(() => {
+        onAction();
         setOffsetX(0);
         setIsOpen(false);
-    }, [onRestore]);
+    }, [onAction]);
 
     return (
         <div
@@ -91,9 +101,9 @@ export default function SwipeableHistoryRow({ children, onRestore, restoreLabel 
                 style={{ width: `${REVEAL_WIDTH}px` }}
             >
                 <button
-                    onClick={handleRestore}
-                    title={restoreLabel}
-                    className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--color-green)] active:bg-[rgba(5,150,105,0.15)] transition-colors"
+                    onClick={handleAction}
+                    title={actionLabel}
+                    className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${actionClassName ?? 'text-[var(--color-green)] active:bg-[rgba(5,150,105,0.15)]'}`}
                 >
                     <svg
                         width="18"
@@ -105,8 +115,14 @@ export default function SwipeableHistoryRow({ children, onRestore, restoreLabel 
                         strokeLinecap="round"
                         strokeLinejoin="round"
                     >
-                        <polyline points="1 4 1 10 7 10" />
-                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                        {iconPath ? (
+                            <path d={iconPath} />
+                        ) : (
+                            <>
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d={DEFAULT_ICON_PATH} />
+                            </>
+                        )}
                     </svg>
                 </button>
             </div>

@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { getLatestThoughtTimestamp, getThoughtEntriesForContainer } from '../lib/thoughts'
+import { getLatestThoughtTimestamp, getThoughtEntriesForContainer, THOUGHT_DELETE_ICON_PATH } from '../lib/thoughts'
 import { useStore } from '../store/useStore'
 import { useTranslation } from '../hooks/useTranslation'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import ThoughtContainerEditorDialog from '../components/ThoughtContainerEditorDialog'
 import ThoughtEditorDialog from '../components/ThoughtEditorDialog'
+import SwipeableHistoryRow from '../components/SwipeableHistoryRow'
 import type { ThoughtContainer, ThoughtEntry } from '../types'
 
 export default function ThoughtsView() {
@@ -16,6 +18,7 @@ export default function ThoughtsView() {
     deleteThoughtEntry,
   } = useStore()
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const [editingContainer, setEditingContainer] = useState<ThoughtContainer | undefined>(undefined)
   const [isContainerDialogOpen, setIsContainerDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ThoughtEntry | undefined>(undefined)
@@ -38,6 +41,11 @@ export default function ThoughtsView() {
       month: 'numeric',
       day: 'numeric',
     })
+  }
+
+  const handleDeleteEntry = async (entryId: string) => {
+    if (!window.confirm(t.thoughts.deleteEntryConfirm)) return
+    await deleteThoughtEntry(entryId)
   }
 
   if (!selectedContainer) {
@@ -179,48 +187,72 @@ export default function ThoughtsView() {
 
       {selectedEntries.length > 0 ? (
         <div className="bg-white border border-[var(--color-border)] rounded-[12px] overflow-hidden shadow-sm">
-          {selectedEntries.map((entry) => (
-            <div key={entry.id} className="border-b border-[var(--color-border)] last:border-b-0 p-4 hover:bg-[var(--color-surface-hover)] transition-colors">
-              <div className="flex items-start justify-between gap-4">
-                <button
-                  onClick={() => {
-                    setEditingEntry(entry)
-                    setIsEntryDialogOpen(true)
-                  }}
-                  className="text-left flex-1 min-w-0"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)]">
-                      {new Date(entry.recordedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                    </span>
-                  </div>
-                  <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">{entry.title}</h3>
-                  <p className="mt-1 text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap line-clamp-3">
-                    {entry.content}
-                  </p>
-                  {entry.tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {entry.tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--color-accent)]/8 text-[var(--color-accent)]">
-                          #{tag}
-                        </span>
-                      ))}
+          {selectedEntries.map((entry, index) => {
+            const rowContent = (
+              <div
+                className={`group p-4 hover:bg-[var(--color-surface-hover)] transition-colors ${index < selectedEntries.length - 1 ? 'border-b border-[var(--color-border)]' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <button
+                    onClick={() => {
+                      setEditingEntry(entry)
+                      setIsEntryDialogOpen(true)
+                    }}
+                    className="text-left flex-1 min-w-0"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[11px] font-medium text-[var(--color-ink-tertiary)]">
+                        {new Date(entry.recordedAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                      </span>
                     </div>
-                  )}
-                </button>
+                    <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">{entry.title}</h3>
+                    <p className="mt-1 text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap line-clamp-3">
+                      {entry.content}
+                    </p>
+                    {entry.tags.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {entry.tags.map((tag) => (
+                          <span key={tag} className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--color-accent)]/8 text-[var(--color-accent)]">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
 
-                <button
-                  onClick={async () => {
-                    if (!window.confirm(t.thoughts.deleteEntryConfirm)) return
-                    await deleteThoughtEntry(entry.id)
-                  }}
-                  className="text-[12px] font-medium text-[var(--color-red)] hover:underline"
-                >
-                  {t.thoughts.deleteEntry}
-                </button>
+                  <button
+                    onClick={() => {
+                      void handleDeleteEntry(entry.id)
+                    }}
+                    title={t.thoughts.deleteEntry}
+                    className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 items-center justify-center rounded-md text-[var(--color-ink-tertiary)] hover:text-[var(--color-red)] hover:bg-red-50 flex-shrink-0"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d={THOUGHT_DELETE_ICON_PATH} />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+
+            if (!isMobile) {
+              return <div key={entry.id}>{rowContent}</div>
+            }
+
+            return (
+              <SwipeableHistoryRow
+                key={entry.id}
+                onAction={() => {
+                  void handleDeleteEntry(entry.id)
+                }}
+                actionLabel={t.thoughts.deleteEntry}
+                iconPath={THOUGHT_DELETE_ICON_PATH}
+                actionClassName="text-[var(--color-red)] active:bg-red-100"
+              >
+                {rowContent}
+              </SwipeableHistoryRow>
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-24 text-[var(--color-ink-tertiary)] text-[14px]">

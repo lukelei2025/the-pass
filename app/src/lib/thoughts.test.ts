@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Item, ThoughtEntry } from '../types'
 import {
+  THOUGHT_DELETE_ICON_PATH,
   THOUGHT_ICON_PATH,
   buildThoughtEntryFromItem,
   getThoughtEntriesForContainer,
@@ -20,6 +21,10 @@ const baseItem: Item = {
 describe('thought domain helpers', () => {
   it('uses a diamond icon path for thoughts actions and navigation', () => {
     expect(THOUGHT_ICON_PATH).toBe('M12 2L22 12L12 22L2 12L12 2Z')
+  })
+
+  it('uses an X icon path for deleting thought entries', () => {
+    expect(THOUGHT_DELETE_ICON_PATH).toBe('M18 6L6 18M6 6l12 12')
   })
 
   it('builds a thought entry from an item and draft input', () => {
