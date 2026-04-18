@@ -206,7 +206,7 @@ export default function ThoughtsView() {
                       </span>
                     </div>
                     <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">{entry.title}</h3>
-                    <p className="mt-1 text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap line-clamp-3">
+                    <p className="mt-1 text-[13px] text-[var(--color-ink-secondary)] whitespace-pre-wrap">
                       {entry.content}
                     </p>
                     {entry.tags.length > 0 && (
