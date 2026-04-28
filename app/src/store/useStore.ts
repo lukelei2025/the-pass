@@ -15,6 +15,7 @@ import {
 import * as firestoreService from '../lib/firestoreService';
 import { buildThoughtEntryFromItem } from '../lib/thoughts';
 import { getStatsDeltasForStatusChange } from '../lib/stats';
+import { buildManualTodoInput } from '../lib/todos';
 
 // 初始化 localForage (kept for migration and offline fallback)
 const itemsStore = localforage.createInstance({
@@ -63,6 +64,7 @@ interface StoreState {
 
   // Items 操作
   addItem: (item: Omit<Item, 'id' | 'createdAt' | 'expiresAt'>) => Promise<void>;
+  createTodoItem: (content: string, updates?: Pick<Item, 'deadline' | 'details' | 'tags'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<Item>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   clearHistory: () => Promise<void>;
@@ -301,6 +303,34 @@ export const useStore = create<StoreState>()(
           await itemsStore.setItem(newItem.id, newItem);
           set((state) => ({
             items: [...state.items, newItem],
+          }));
+        }
+      },
+
+      createTodoItem: async (content, updates = {}) => {
+        const baseItem = buildManualTodoInput(content);
+        const newItem: Item = {
+          ...baseItem,
+          ...updates,
+          id: generateId(),
+          createdAt: Date.now(),
+          expiresAt: calculateExpireTime(get().settings.expireHours),
+          details: updates.details ?? baseItem.details,
+          tags: updates.tags ?? baseItem.tags,
+          deadline: updates.deadline ?? baseItem.deadline,
+        };
+
+        const { userId } = get();
+
+        if (userId) {
+          await firestoreService.addItem(userId, newItem);
+          await firestoreService.incrementStats(userId, { totalTodos: 1 });
+          set((state) => ({ stats: { ...state.stats, totalTodos: state.stats.totalTodos + 1 } }));
+        } else {
+          await itemsStore.setItem(newItem.id, newItem);
+          set((state) => ({
+            items: [...state.items, newItem],
+            stats: { ...state.stats, totalTodos: state.stats.totalTodos + 1 },
           }));
         }
       },

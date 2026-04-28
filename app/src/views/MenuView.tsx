@@ -1,14 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { getRemainingTime, formatRemainingTime } from '../lib/constants';
 import ItemCard from '../components/ItemCard';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFilters } from '../hooks/useFilters';
 import SearchBar from '../components/ui/SearchBar';
+import TodoEditorDialog from '../components/TodoEditorDialog';
 
 export default function MenuView() {
   const { items } = useStore();
   const { t } = useTranslation();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // 所有 todo 项目，按创建时间倒序
   const todoItems = useMemo(() =>
@@ -32,9 +34,17 @@ export default function MenuView() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
         <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.menu.title}</h2>
-        <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
-          {filteredItems.length}{hasActiveFilters ? ` / ${todoItems.length}` : ''} items
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="px-3 py-1.5 rounded-lg text-[13px] font-medium bg-[var(--color-accent)] text-white hover:brightness-110 transition-all"
+          >
+            {t.menu.newTodo}
+          </button>
+          <span className="text-[13px] font-medium text-[var(--color-ink-secondary)]">
+            {filteredItems.length}{hasActiveFilters ? ` / ${todoItems.length}` : ''} items
+          </span>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -88,6 +98,12 @@ export default function MenuView() {
           )}
         </div>
       )}
+
+      <TodoEditorDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        createMode="todo"
+      />
     </div>
   );
 }

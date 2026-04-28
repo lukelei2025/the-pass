@@ -5,14 +5,15 @@ import { useStore } from '../store/useStore';
 import type { Item } from '../types';
 
 interface TodoEditorDialogProps {
-    item: Item;
+    item?: Item;
     isOpen: boolean;
     onClose: () => void;
     newStatus?: Item['status'];
+    createMode?: 'todo';
 }
 
-export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: TodoEditorDialogProps) {
-    if (!isOpen) return null;
+export default function TodoEditorDialog({ item, isOpen, onClose, newStatus, createMode }: TodoEditorDialogProps) {
+    if (!isOpen || (!item && !createMode)) return null;
 
     return (
         <TodoEditorDialogContent
@@ -23,10 +24,11 @@ export default function TodoEditorDialog({ item, isOpen, onClose, newStatus }: T
     );
 }
 
-function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDialogProps, 'isOpen'>) {
+function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDialogProps, 'isOpen' | 'createMode'>) {
     const { t } = useTranslation();
-    const { updateItem } = useStore();
-    const initialDeadline = item.deadline ? new Date(item.deadline) : null;
+    const { updateItem, createTodoItem } = useStore();
+    const isCreatingTodo = !item;
+    const initialDeadline = item?.deadline ? new Date(item.deadline) : null;
     const [deadlineDate, setDeadlineDate] = useState(() => {
         if (!initialDeadline) return '';
         const yyyy = initialDeadline.getFullYear();
@@ -40,15 +42,13 @@ function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDi
         const min = String(initialDeadline.getMinutes()).padStart(2, '0');
         return `${hh}:${min}`;
     });
-    const [content, setContent] = useState(() => item.title || item.content || '');
-    const [details, setDetails] = useState(() => item.details || '');
-    const [tags, setTags] = useState<string[]>(() => item.tags || []);
+    const [content, setContent] = useState(() => item?.title || item?.content || '');
+    const [details, setDetails] = useState(() => item?.details || '');
+    const [tags, setTags] = useState<string[]>(() => item?.tags || []);
     const [tagInput, setTagInput] = useState('');
     const [isAddingTag, setIsAddingTag] = useState(false);
 
-    // Determine if we are in "Frozen/Collection" mode
-    // Either moving to frozen (newStatus) OR editing an existing frozen item
-    const isFrozen = newStatus === 'frozen' || (!newStatus && item.status === 'frozen');
+    const isFrozen = !isCreatingTodo && (newStatus === 'frozen' || (!newStatus && item.status === 'frozen'));
 
     const handleAddTag = () => {
         const trimmed = tagInput.trim();
@@ -56,7 +56,7 @@ function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDi
             setTags([...tags, trimmed]);
         }
         setTagInput('');
-        setIsAddingTag(false); // Close input even if empty or duplicate
+        setIsAddingTag(false);
     };
 
     const removeTag = (tagToRemove: string) => {
@@ -75,6 +75,18 @@ function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDi
             }
         }
 
+        if (isCreatingTodo) {
+            if (!content.trim()) return;
+
+            await createTodoItem(content, {
+                deadline: deadlineTimestamp,
+                details: details.trim() || null,
+                tags: tags.length > 0 ? tags : null,
+            });
+            onClose();
+            return;
+        }
+
         const updates: Partial<Item> = {
             content: content.trim() || item.title || item.content,
             deadline: deadlineTimestamp,
@@ -91,13 +103,15 @@ function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDi
         onClose();
     };
 
-    // Determine Title
     let title = t.todoEditor.editTodo;
-    if (newStatus === 'frozen') {
+    if (isCreatingTodo) {
+        title = t.todoEditor.createTodo;
+    } else if (newStatus === 'frozen') {
         title = t.todoEditor.stashToCollection;
     } else if (isFrozen) {
         title = t.item.editNote;
     }
+
     return createPortal(
         <div
             className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
@@ -228,7 +242,7 @@ function TodoEditorDialogContent({ item, onClose, newStatus }: Omit<TodoEditorDi
                             onClick={handleSave}
                             className="px-4 py-2 text-[14px] font-medium text-white bg-[var(--color-accent)] hover:brightness-110 rounded-lg shadow-sm active:scale-95 transition-all"
                         >
-                            {newStatus === 'frozen' ? t.todoEditor.stashItem : t.todoEditor.saveDetails}
+                            {isCreatingTodo ? t.todoEditor.createItem : newStatus === 'frozen' ? t.todoEditor.stashItem : t.todoEditor.saveDetails}
                         </button>
                     </div>
                 </div>

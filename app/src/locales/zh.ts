@@ -84,6 +84,7 @@ export const zh: Locale = {
     menu: {
         title: '待办',
         empty: '暂无待办事项。干得好！',
+        newTodo: '新增事项',
     },
     freezer: {
         title: '收藏',
@@ -162,6 +163,7 @@ export const zh: Locale = {
         titlePlaceholder: '输入内容或标题...',
         clearDeadline: '清除日期',
         editTodo: '编辑待办',
+        createTodo: '新增事项',
         editCollection: '编辑项目',
         stashToCollection: '加入收藏',
         deadline: '截止日期',
@@ -170,6 +172,7 @@ export const zh: Locale = {
         placeholderDetails: '添加详情、笔记或子任务...',
         placeholderStash: '添加想法、标签或上下文...',
         saveDetails: '保存详情',
+        createItem: '创建事项',
         stashItem: '加入收藏',
         cancel: '取消',
         tags: '标签',

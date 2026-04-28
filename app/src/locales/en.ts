@@ -82,6 +82,7 @@ export const en = {
     menu: {
         title: 'To-do',
         empty: 'No tasks yet. Good job!',
+        newTodo: 'New item',
     },
     freezer: {
         title: 'Stash',
@@ -160,6 +161,7 @@ export const en = {
         titlePlaceholder: 'Enter content or title...',
         clearDeadline: 'Clear date',
         editTodo: 'Edit Todo',
+        createTodo: 'New item',
         editCollection: 'Edit Item',
         stashToCollection: 'Stash to Collection',
         deadline: 'Deadline',
@@ -168,6 +170,7 @@ export const en = {
         placeholderDetails: 'Add details, notes, or subtasks...',
         placeholderStash: 'Add thoughts, tags, or context...',
         saveDetails: 'Save Details',
+        createItem: 'Create item',
         stashItem: 'Stash Item',
         cancel: 'Cancel',
         tags: 'Tags',
