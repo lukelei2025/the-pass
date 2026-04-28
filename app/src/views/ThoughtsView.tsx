@@ -5,6 +5,7 @@ import { useTranslation } from '../hooks/useTranslation'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import ThoughtContainerEditorDialog from '../components/ThoughtContainerEditorDialog'
 import ThoughtEditorDialog from '../components/ThoughtEditorDialog'
+import ThoughtExportDialog from '../components/ThoughtExportDialog'
 import SwipeableHistoryRow from '../components/SwipeableHistoryRow'
 import type { ThoughtContainer, ThoughtEntry } from '../types'
 
@@ -23,6 +24,8 @@ export default function ThoughtsView() {
   const [isContainerDialogOpen, setIsContainerDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<ThoughtEntry | undefined>(undefined)
   const [isEntryDialogOpen, setIsEntryDialogOpen] = useState(false)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [exportContainerId, setExportContainerId] = useState<string | null>(null)
 
   const selectedContainer = thoughtContainers.find((container) => container.id === selectedThoughtContainerId)
   const selectedEntries = useMemo(() => {
@@ -48,17 +51,37 @@ export default function ThoughtsView() {
     await deleteThoughtEntry(entryId)
   }
 
+  const openExportDialog = (containerId: string | null) => {
+    setExportContainerId(containerId)
+    setIsExportDialogOpen(true)
+  }
+
   if (!selectedContainer) {
     return (
       <div className="space-y-6 pb-20">
         <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
           <h2 className="text-[20px] font-semibold text-[var(--color-ink)]">{t.thoughts.title}</h2>
-          <button
-            onClick={openNewContainerDialog}
-            className="px-3 py-1.5 rounded-lg text-[13px] font-medium bg-[var(--color-accent)] text-white hover:brightness-110 transition-all"
-          >
-            {t.thoughts.newContainer}
-          </button>
+          <div className="flex items-center gap-2">
+            {thoughtContainers.length > 0 && (
+              <button
+                onClick={() => openExportDialog(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-[var(--color-accent)] bg-[var(--color-accent)]/5 hover:bg-[var(--color-accent)]/10 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {t.thoughts.exportExcel}
+              </button>
+            )}
+            <button
+              onClick={openNewContainerDialog}
+              className="px-3 py-1.5 rounded-lg text-[13px] font-medium bg-[var(--color-accent)] text-white hover:brightness-110 transition-all"
+            >
+              {t.thoughts.newContainer}
+            </button>
+          </div>
         </div>
 
         {thoughtContainers.length > 0 ? (
@@ -124,6 +147,18 @@ export default function ThoughtsView() {
             }}
           />
         )}
+
+        {isExportDialogOpen && (
+          <ThoughtExportDialog
+            containers={thoughtContainers}
+            entries={thoughtEntries}
+            initialSelectedContainerId={exportContainerId}
+            onClose={() => {
+              setExportContainerId(null)
+              setIsExportDialogOpen(false)
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -145,6 +180,17 @@ export default function ThoughtsView() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => openExportDialog(selectedContainer.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-[var(--color-accent)] bg-[var(--color-accent)]/5 hover:bg-[var(--color-accent)]/10 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {t.thoughts.exportExcel}
+          </button>
           <button
             onClick={() => {
               setEditingContainer(selectedContainer)
@@ -277,6 +323,18 @@ export default function ThoughtsView() {
           onClose={() => {
             setEditingEntry(undefined)
             setIsEntryDialogOpen(false)
+          }}
+        />
+      )}
+
+      {isExportDialogOpen && (
+        <ThoughtExportDialog
+          containers={thoughtContainers}
+          entries={thoughtEntries}
+          initialSelectedContainerId={exportContainerId}
+          onClose={() => {
+            setExportContainerId(null)
+            setIsExportDialogOpen(false)
           }}
         />
       )}
